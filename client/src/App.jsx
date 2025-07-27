@@ -516,7 +516,7 @@ export default function App() {
     
     // Determine winner at the end of the round
     useEffect(() => {
-        if (gameState === 'end' && playerHands[0].cards.length > 0) {
+        if (gameState === 'end' && playerHands[0].cards.length > 0 && !endOfRoundMessageSet.current) {
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
             
