@@ -525,10 +525,10 @@ export default function App() {
 
     }, [gameState, calculateScore, dealCard]);
     
-    // Determine winner at the end of the round
+    // Consolidated End-of-Round Logic (Winner Determination & Auto-Deal)
     useEffect(() => {
-        if (gameState === 'end' && playerHands[0].cards.length > 0 && !endOfRoundMessageSet.current) {
-            endOfRoundMessageSet.current = true; // Lock this effect
+        if (gameState === 'end' && !endOfRoundMessageSet.current) {
+            endOfRoundMessageSet.current = true; // Lock this effect to run only once per round end
             
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
@@ -577,20 +577,14 @@ export default function App() {
             setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
             const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
             setMessage(finalMessage);
-        }
-    }, [gameState, playerHands, dealerHand.cards, calculateScore]);
 
-    // Auto-deal timer logic
-    const dealCallback = useRef(dealNewGame);
-    useEffect(() => { dealCallback.current = dealNewGame; });
-
-    useEffect(() => {
-        let timerId;
-        if (gameState === 'end' && autoDeal) {
-            timerId = setTimeout(() => dealCallback.current(), 2500);
+            // Start auto-deal timer if enabled
+            if (autoDeal) {
+                const timerId = setTimeout(dealNewGame, 2500);
+                return () => clearTimeout(timerId); // Cleanup timer on component unmount or re-run
+            }
         }
-        return () => clearTimeout(timerId);
-    }, [gameState, autoDeal]);
+    }, [gameState, playerHands, dealerHand.cards, calculateScore, autoDeal, dealNewGame]);
 
     // Auto-clear feedback message
     useEffect(() => {
