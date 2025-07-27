@@ -662,7 +662,11 @@ export default function App() {
 
                     {/* Feedback Area */}
                     <div className="text-center my-2 h-16 flex items-center justify-center">
-                        <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg">{feedback || message}</p>
+                        {(feedback || message) &&
+                            <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
+                                {feedback || message}
+                            </p>
+                        }
                     </div>
 
                     {/* Player Area */}
@@ -729,6 +733,11 @@ export default function App() {
                     to { opacity: 1; transform: translateY(0) scale(1); }
                 }
                 .animate-deal { animation: deal 0.4s ease-out forwards; }
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
             `}</style>
         </div>
     );
