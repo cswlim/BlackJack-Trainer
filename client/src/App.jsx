@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 // --- HELPER FUNCTIONS & DATA ---
 
-// Basic Strategy Chart (simplified for clarity, can be expanded)
+// Basic Strategy Chart based on provided image.
 // Returns the optimal move: 'H' (Hit), 'S' (Stand), 'D' (Double), 'P' (Split)
-const getBasicStrategy = (playerHand, dealerUpCardRank) => {
+const getBasicStrategy = (playerHand, dealerUpCard) => {
     const handValue = card => {
+        if (!card) return 0;
         if (['J', 'Q', 'K'].includes(card.rank)) return 10;
         if (card.rank === 'A') return 11;
         return parseInt(card.rank);
@@ -22,38 +23,83 @@ const getBasicStrategy = (playerHand, dealerUpCardRank) => {
             score -= 10;
             aceCount--;
         }
-        return { score, isSoft: aceCount > 0 && score - 10 <= 10 };
+        return { score, isSoft: aceCount > 0 && (score + 10 <= 21 || score - 10 > 0) };
     };
 
     const player = calculateScore(playerHand);
-    const dealerValue = handValue(dealerUpCardRank);
+    const dealerValue = handValue(dealerUpCard);
 
-    // Check for splitting pairs
+    // PAIR SPLITTING LOGIC from the chart
     if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
         const rank = playerHand[0].rank;
-        if (rank === 'A' || rank === '8') return 'P';
-        if (rank === '5' || rank === '10' || rank === 'J' || rank === 'Q' || rank === 'K') return 'S'; // Never split 5s or 10s
-        if (rank === '9' && ![7, 10, 11].includes(dealerValue)) return 'P';
-        if (rank === '7' && dealerValue <= 7) return 'P';
-        if (rank === '6' && dealerValue <= 6) return 'P';
-        if (rank === '4' && [5, 6].includes(dealerValue)) return 'P';
-        if ((rank === '2' || rank === '3') && dealerValue <= 7) return 'P';
+        if (rank === 'A' || rank === '8') return 'P'; // Always split Aces and 8s
+        if (rank === '9') {
+            if ([7, 10, 11].includes(dealerValue)) return 'S'; // Stand against 7, 10, A
+            return 'P'; // Split against 2-6, 8, 9
+        }
+        if (rank === '7') {
+            if (dealerValue <= 7) return 'P'; // Split against 2-7
+            return 'H'; // Hit against 8, 9, 10, A
+        }
+        if (rank === '6') {
+            if (dealerValue <= 6) return 'P'; // Split against 2-6
+            return 'H'; // Hit against 7-A
+        }
+        if (rank === '5') { // This is treated as a hard 10
+            if (dealerValue <= 9) return 'D';
+            return 'H';
+        }
+        if (rank === '4') {
+            if ([5, 6].includes(dealerValue)) return 'P'; // Split against 5, 6
+            return 'H'; // Hit against others
+        }
+        if (rank === '3' || rank === '2') {
+            if (dealerValue <= 7) return 'P'; // Split against 2-7
+            return 'H'; // Hit against 8-A
+        }
+        if (['10', 'J', 'Q', 'K'].includes(rank)) return 'S'; // Never split 10s
     }
 
-    // Soft hands
+    // SOFT HANDS LOGIC from the chart
     if (player.isSoft) {
-        if (player.score >= 19) return 'S';
-        if (player.score === 18) return dealerValue <= 8 ? 'S' : 'H';
-        return 'H'; // A2-A6
+        const softTotal = player.score;
+        if (softTotal >= 19) return 'S'; // A-8, A-9, A-10 always stand
+        if (softTotal === 18) { // A-7
+            if (dealerValue >= 9) return 'H'; // Hit against 9, 10, A
+            return 'S'; // Stand against 2-8
+        }
+        if (softTotal === 17) return 'H'; // A-6 always hits
+        if (softTotal === 16 || softTotal === 15) { // A-5, A-4
+             if ([4,5,6].includes(dealerValue)) return 'D';
+             return 'H';
+        }
+        if (softTotal === 14 || softTotal === 13) { // A-3, A-2
+             if ([5,6].includes(dealerValue)) return 'D';
+             return 'H';
+        }
     }
 
-    // Hard hands
-    if (player.score >= 17) return 'S';
-    if (player.score >= 13 && player.score <= 16) return dealerValue <= 6 ? 'S' : 'H';
-    if (player.score === 12) return [4, 5, 6].includes(dealerValue) ? 'S' : 'H';
-    if (player.score === 11) return 'D';
-    if (player.score === 10) return dealerValue <= 9 ? 'D' : 'H';
-    if (player.score === 9) return dealerValue >= 3 && dealerValue <= 6 ? 'D' : 'H';
+    // HARD HANDS LOGIC from the chart
+    const hardTotal = player.score;
+    if (hardTotal >= 17) return 'S';
+    if (hardTotal >= 13 && hardTotal <= 16) {
+        if (dealerValue <= 6) return 'S';
+        return 'H';
+    }
+    if (hardTotal === 12) {
+        if ([4, 5, 6].includes(dealerValue)) return 'S';
+        return 'H';
+    }
+    if (hardTotal === 11) return 'D';
+    if (hardTotal === 10) {
+        if (dealerValue <= 9) return 'D';
+        return 'H';
+    }
+    if (hardTotal === 9) {
+        if (dealerValue >= 3 && dealerValue <= 6) return 'D';
+        return 'H';
+    }
+    // 5-8
     return 'H';
 };
 
@@ -181,7 +227,7 @@ export default function App() {
             score -= 10;
             aceCount--;
         }
-        return { score, isSoft: aceCount > 0 && score - 10 <= 21 };
+        return { score, isSoft: aceCount > 0 && score + 10 <= 21 };
     }, []);
 
     // --- ATOMIC CARD DEALING ---
