@@ -124,10 +124,18 @@ const Card = ({ suit, rank, isHidden, isCutCard }) => {
     }
     const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
     return (
-        <div className="w-24 h-36 md:w-28 md:h-40 bg-white rounded-lg border border-gray-200 shadow-md p-2 flex flex-col justify-between transition-all transform animate-deal">
-            <div className={`text-2xl font-bold ${suitColor}`}>{rank}{suit}</div>
-            <div className={`text-4xl font-bold self-center ${suitColor}`}>{suit}</div>
-            <div className={`text-2xl font-bold self-end rotate-180 ${suitColor}`}>{rank}{suit}</div>
+        <div className="relative w-24 h-36 md:w-28 md:h-40 bg-white rounded-lg border border-gray-200 shadow-md p-2 transition-all transform animate-deal">
+            <div className={`absolute top-1 left-2 text-center leading-none ${suitColor}`}>
+                <p className="text-xl font-bold">{rank}</p>
+                <p className="text-lg">{suit}</p>
+            </div>
+            <div className={`absolute inset-0 flex items-center justify-center text-5xl ${suitColor}`}>
+                {suit}
+            </div>
+            <div className={`absolute bottom-1 right-2 text-center leading-none rotate-180 ${suitColor}`}>
+                <p className="text-xl font-bold">{rank}</p>
+                <p className="text-lg">{suit}</p>
+            </div>
         </div>
     );
 };
