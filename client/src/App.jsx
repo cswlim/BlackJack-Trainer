@@ -321,7 +321,6 @@ export default function App() {
                 // All 4 cards have been dealt, now set the state
                 const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
 
-                setGameState('player-turn');
                 setMessage('');
                 setFeedback('');
                 setActiveHandIndex(0);
@@ -338,6 +337,8 @@ export default function App() {
 
                 if (playerHasBj || dealerHasBj) {
                     setGameState('end');
+                } else {
+                    setGameState('player-turn');
                 }
             }
         };
@@ -517,6 +518,8 @@ export default function App() {
     // Determine winner at the end of the round
     useEffect(() => {
         if (gameState === 'end' && playerHands[0].cards.length > 0 && !endOfRoundMessageSet.current) {
+            endOfRoundMessageSet.current = true; // Lock this effect
+            
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
             
@@ -573,8 +576,7 @@ export default function App() {
 
     useEffect(() => {
         let timerId;
-        if (gameState === 'end' && !endOfRoundMessageSet.current && autoDeal) {
-            endOfRoundMessageSet.current = true;
+        if (gameState === 'end' && autoDeal) {
             timerId = setTimeout(() => dealCallback.current(), 2500);
         }
         return () => clearTimeout(timerId);
