@@ -1,6 +1,6 @@
 // App.js
 import React, { useState } from 'react';
-//import './App.css';
+import './App.css';
 
 const initialState = {
   playerHand: [],
@@ -33,28 +33,28 @@ const App = () => {
   };
 
   return (
-    <div className="app">
+    <div className="app-container">
       <div className="header">
-        <h1>Blackjack Trainer</h1>
+        <h1 className="title">Blackjack Trainer</h1>
         <button className="deal-button" onClick={deal}>Deal</button>
       </div>
 
       <div className="hands">
         <div className="hand">
-          <strong>Player:</strong> {formatHand(state.playerHand)}
+          <strong>Player:</strong> <span>{formatHand(state.playerHand)}</span>
         </div>
         <div className="hand">
-          <strong>Dealer:</strong> {formatHand(state.dealerHand, true)}
+          <strong>Dealer:</strong> <span>{formatHand(state.dealerHand, true)}</span>
         </div>
         <p className="message">{state.message}</p>
       </div>
 
       {state.dealt && (
         <div className="actions">
-          <button className="action-button blue">Hit</button>
-          <button className="action-button green">Stand</button>
-          <button className="action-button yellow">Double</button>
-          <button className="action-button red">Split</button>
+          <button className="action-button hit">Hit</button>
+          <button className="action-button stand">Stand</button>
+          <button className="action-button double">Double</button>
+          <button className="action-button split">Split</button>
         </div>
       )}
     </div>
