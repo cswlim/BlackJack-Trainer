@@ -355,15 +355,15 @@ export default function App() {
     }, [deck.length, isCutCardRevealed, createShoe, calculateScore, dealCard]);
     
     // Player Actions
-    const handlePlayerAction = (action) => {
+    const handlePlayerAction = (actionCode, actionName) => {
         if (gameState !== 'player-turn') return;
 
         const currentHandRef = playerHands[activeHandIndex];
         const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
-        const isCorrect = action.charAt(0) === correctMove;
-        const feedbackText = `Your move: ${action}. Strategy: ${correctMove}.`;
+        const isCorrect = actionCode === correctMove;
+        const feedbackText = `Your move: ${actionName}. Strategy: ${correctMove}.`;
         const historyItem = { text: feedbackText, correct: isCorrect };
 
         setHistory(prevHistory => [historyItem, ...prevHistory]);
@@ -376,9 +376,9 @@ export default function App() {
         }
         setFeedback(`${feedbackText} ${isCorrect ? '✅' : '❌'}`);
 
-        switch(action) {
-            case 'Hit':
-            case 'Double':
+        switch(actionCode) {
+            case 'H':
+            case 'D':
                 dealCard(card => {
                     if(!card) return;
                     setPlayerHands(prevHands => {
@@ -386,12 +386,12 @@ export default function App() {
                         const currentHand = newHands[activeHandIndex];
                         currentHand.cards.push(card);
                         Object.assign(currentHand, calculateScore(currentHand.cards));
-                        if(action === 'Double') currentHand.status = 'stood';
+                        if(actionCode === 'D') currentHand.status = 'stood';
                         return newHands;
                     });
                 });
                 break;
-            case 'Stand': {
+            case 'S': {
                 setPlayerHands(prevHands => {
                     const newHands = JSON.parse(JSON.stringify(prevHands));
                     const currentHand = newHands[activeHandIndex];
@@ -400,7 +400,7 @@ export default function App() {
                 });
                 break;
             }
-            case 'Split': {
+            case 'P': {
                 const handToSplit = playerHands[activeHandIndex].cards;
                 const hand1 = { cards: [handToSplit[0]], status: 'playing' };
                 const hand2 = { cards: [handToSplit[1]], status: 'playing' };
@@ -412,6 +412,16 @@ export default function App() {
     };
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
+    
+    // Theme toggler effect
+    useEffect(() => {
+        const root = window.document.documentElement;
+        if (theme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+    }, [theme]);
     
     // Automatically deal a second card to a newly split hand
     useEffect(() => {
@@ -577,14 +587,22 @@ export default function App() {
             setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
             const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
             setMessage(finalMessage);
-
-            // Start auto-deal timer if enabled
-            if (autoDeal) {
-                const timerId = setTimeout(dealNewGame, 2500);
-                return () => clearTimeout(timerId); // Cleanup timer on component unmount or re-run
-            }
         }
-    }, [gameState, playerHands, dealerHand.cards, calculateScore, autoDeal, dealNewGame]);
+    }, [gameState, playerHands, dealerHand.cards, calculateScore]);
+
+    // Auto-deal timer logic
+    const dealCallback = useRef(dealNewGame);
+    useEffect(() => { dealCallback.current = dealNewGame; });
+
+    useEffect(() => {
+        let timerId;
+        if (gameState === 'end' && autoDeal) {
+            timerId = setTimeout(() => dealCallback.current(), 2500);
+        }
+        return () => {
+            if (timerId) clearTimeout(timerId);
+        };
+    }, [gameState, autoDeal]);
 
     // Auto-clear feedback message
     useEffect(() => {
@@ -641,7 +659,7 @@ export default function App() {
 
     if (!gameMode) {
         return (
-            <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} bg-gray-100 dark:bg-gray-900`}>
+            <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-100 dark:bg-gray-900`}>
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 transition-colors duration-300">Blackjack Trainer</h1>
                 <p className="text-gray-600 dark:text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
                 <div className="flex space-x-4">
@@ -653,7 +671,7 @@ export default function App() {
     }
 
     return (
-        <div className={`min-h-screen font-sans p-4 flex flex-col items-center transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
+        <div className={`min-h-screen font-sans p-4 flex flex-col items-center transition-colors duration-300 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
             {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} />}
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <div className="w-full max-w-7xl mx-auto">
@@ -733,23 +751,23 @@ export default function App() {
                 
                 {/* Action Buttons */}
                 <div className="mt-6 flex justify-center space-x-2 md:space-x-4">
-                     {['Hit', 'Stand', 'Double', 'Split'].map(action => (
+                     {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
                          <button
-                             key={action}
+                             key={actionName}
                              onClick={() => {
-                                 if (gameMode === 'counting' && action !== 'Stand') {
+                                 if (gameMode === 'counting' && actionCode !== 'S') {
                                      setShowCountPrompt(true);
                                  }
-                                 handlePlayerAction(action);
+                                 handlePlayerAction(actionCode, actionName);
                              }}
-                             disabled={gameState !== 'player-turn' || (action === 'Split' && !canSplit) || (action === 'Double' && !canDouble)}
+                             disabled={gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
                              className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
-                                 ${action === 'Hit' && 'bg-green-500 text-white'}
-                                 ${action === 'Stand' && 'bg-red-500 text-white'}
-                                 ${action === 'Double' && 'bg-orange-400 text-white'}
-                                 ${action === 'Split' && 'bg-blue-500 text-white'}`}
+                                 ${actionCode === 'H' && 'bg-green-500 text-white'}
+                                 ${actionCode === 'S' && 'bg-red-500 text-white'}
+                                 ${actionCode === 'D' && 'bg-orange-400 text-white'}
+                                 ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
                          >
-                             {action}
+                             {actionName}
                          </button>
                      ))}
                 </div>
