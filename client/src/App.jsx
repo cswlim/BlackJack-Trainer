@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // --- HELPER FUNCTIONS & DATA ---
 
@@ -133,6 +133,7 @@ export default function App() {
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
     const [autoDealTimer, setAutoDealTimer] = useState(null);
+    const endOfRoundMessageSet = useRef(false); // Ref to prevent multiple end-of-round messages
 
     // --- DECK & SHOE LOGIC ---
     const createShoe = useCallback(() => {
@@ -183,25 +184,22 @@ export default function App() {
         return { score, isSoft: aceCount > 0 && score + 10 <= 21 };
     }, []);
 
-    // --- GAME ACTIONS ---
-    const dealCard = useCallback((targetHand, isHidden = false) => {
+    const dealCardFromDeck = useCallback(() => {
         if (deck.length === 0) return null;
         if (deck.length === (52 * NUM_DECKS) - cutCardPosition && gameMode === 'counting') {
             setIsCutCardRevealed(true);
             setMessage("Cut card revealed! Reshuffling after this round.");
         }
-        const card = deck.pop();
-        setDeck([...deck]);
-        if (gameMode === 'counting' && !isHidden) {
-            setRunningCount(prev => prev + getCardCountValue(card));
-        }
-        targetHand.push({ ...card, isHidden });
+        const newDeck = [...deck];
+        const card = newDeck.pop();
+        setDeck(newDeck);
         return card;
     }, [deck, cutCardPosition, gameMode]);
 
     const dealNewGame = useCallback(() => {
         if (autoDealTimer) clearTimeout(autoDealTimer);
         setAutoDealTimer(null);
+        endOfRoundMessageSet.current = false; // Reset the flag for the new round
 
         if (deck.length < 52 || isCutCardRevealed) { // Reshuffle if deck is low or cut card was shown
             createShoe();
@@ -215,33 +213,18 @@ export default function App() {
         setPlayerHands([{ cards: [], score: 0, isSoft: false, status: 'playing' }]);
         setActiveHandIndex(0);
 
-        let tempPlayerHand = [];
-        let tempDealerHand = [];
-        let tempTableHands = Array.from({ length: 7 }, () => []);
-
-        if (gameMode === 'solo') {
-            dealCard(tempPlayerHand);
-            dealCard(tempDealerHand, true);
-            dealCard(tempPlayerHand);
-            dealCard(tempDealerHand);
-        } else { // Counting mode
-            for(let i = 0; i < 2; i++) {
-                for(let j = 0; j < 7; j++) { dealCard(tempTableHands[j]); }
-                dealCard(tempDealerHand, i === 0);
-            }
-            setTableHands(tempTableHands.map(h => ({cards: h, ...calculateScore(h)})));
-            tempPlayerHand = tempTableHands[playerSeat];
-        }
+        let tempPlayerHand = [dealCardFromDeck(), dealCardFromDeck()];
+        let tempDealerHand = [dealCardFromDeck(), dealCardFromDeck()];
+        tempDealerHand[1].isHidden = true;
 
         const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-        const dealerInitialState = { cards: tempDealerHand, ...calculateScore(tempDealerHand) };
         setPlayerHands([playerInitialState]);
-        setDealerHand(dealerInitialState);
+        setDealerHand({ cards: tempDealerHand, ...calculateScore(tempDealerHand) });
 
         if (playerInitialState.score === 21) {
             setMessage('Blackjack! You win!');
             setGameState('end');
-        } else if (calculateScore(dealerInitialState.cards.map(c => ({...c, isHidden: false}))).score === 21) {
+        } else if (calculateScore(tempDealerHand.map(c => ({...c, isHidden: false}))).score === 21) {
             setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
             setMessage('Dealer has Blackjack. You lose.');
             setGameState('end');
@@ -249,7 +232,7 @@ export default function App() {
             setShowCountPrompt(true);
         }
 
-    }, [deck, gameMode, playerSeat, isCutCardRevealed, createShoe, dealCard, calculateScore, autoDealTimer]);
+    }, [deck.length, isCutCardRevealed, createShoe, dealCardFromDeck, calculateScore, autoDealTimer, gameMode]);
     
     // Player Actions
     const handlePlayerAction = (action) => {
@@ -267,13 +250,13 @@ export default function App() {
         }
         setFeedback(feedbackMsg);
 
-        const newHands = [...playerHands];
+        const newHands = JSON.parse(JSON.stringify(playerHands));
 
         switch(action) {
             case 'Hit': {
                 const currentHand = newHands[activeHandIndex];
-                dealCard(currentHand.cards);
-                Object.assign(currentHand, calculateScore(currentHand.cards)); // Update score immediately
+                currentHand.cards.push(dealCardFromDeck());
+                Object.assign(currentHand, calculateScore(currentHand.cards));
                 setPlayerHands(newHands);
                 break;
             }
@@ -290,8 +273,8 @@ export default function App() {
             }
             case 'Double': {
                 const currentHand = newHands[activeHandIndex];
-                dealCard(currentHand.cards);
-                Object.assign(currentHand, calculateScore(currentHand.cards)); // Update score immediately
+                currentHand.cards.push(dealCardFromDeck());
+                Object.assign(currentHand, calculateScore(currentHand.cards));
                 currentHand.status = 'stood';
                 if (activeHandIndex < newHands.length - 1) {
                     setActiveHandIndex(activeHandIndex + 1);
@@ -303,15 +286,10 @@ export default function App() {
             }
             case 'Split': {
                 const handToSplit = newHands[activeHandIndex].cards;
-                const hand1 = { cards: [handToSplit[0]], status: 'playing' };
-                const hand2 = { cards: [handToSplit[1]], status: 'playing' };
-                
-                dealCard(hand1.cards);
+                const hand1 = { cards: [handToSplit[0], dealCardFromDeck()], status: 'playing' };
+                const hand2 = { cards: [handToSplit[1], dealCardFromDeck()], status: 'playing' };
                 Object.assign(hand1, calculateScore(hand1.cards));
-
-                dealCard(hand2.cards);
                 Object.assign(hand2, calculateScore(hand2.cards));
-
                 newHands.splice(activeHandIndex, 1, hand1, hand2);
                 setPlayerHands(newHands);
                 break;
@@ -321,63 +299,47 @@ export default function App() {
     };
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
-
+    
     // Check player hand status (busts, 21) after an action
     useEffect(() => {
-        if(gameState !== 'player-turn') return;
+        if (gameState !== 'player-turn') return;
 
-        const newHands = [...playerHands];
+        const originalHandsJSON = JSON.stringify(playerHands);
+        const newHands = JSON.parse(originalHandsJSON);
         let allHandsDone = true;
-        
-        newHands.forEach((hand) => {
+
+        newHands.forEach(hand => {
             if (hand.status === 'playing') {
                 if (hand.score > 21) {
                     hand.status = 'bust';
-                    setFeedback(prev => prev + " Your hand busted.");
                 } else if (hand.score === 21) {
                     hand.status = 'stood';
                 }
-            }
-            if (hand.status === 'playing') {
-                allHandsDone = false;
+                if (hand.status === 'playing') {
+                    allHandsDone = false;
+                }
             }
         });
 
-        // Only update state if there was a change in status
-        if (JSON.stringify(newHands) !== JSON.stringify(playerHands)) {
+        if (JSON.stringify(newHands) !== originalHandsJSON) {
             setPlayerHands(newHands);
         }
-        
-        if (allHandsDone) {
-            const nextActiveHand = newHands.findIndex(h => h.status === 'playing');
-            if (nextActiveHand === -1) {
-                setGameState('dealer-turn');
-            } else {
-                setActiveHandIndex(nextActiveHand);
-            }
-        }
 
-    }, [playerHands, gameState]);
-    
-    // Dealer's turn logic
-    useEffect(() => {
-        if (gameState !== 'dealer-turn') return;
-        
-        let revealedDealerHand = { ...dealerHand, cards: dealerHand.cards.map(c => ({...c, isHidden: false})) };
-        if (gameMode === 'counting') {
-            const hiddenCard = dealerHand.cards.find(c => c.isHidden);
-            if(hiddenCard) setRunningCount(prev => prev + getCardCountValue(hiddenCard));
+        if (allHandsDone) {
+            setGameState('dealer-turn');
         }
-        setDealerHand(revealedDealerHand);
+    }, [playerHands, gameState]);
+
+    const playDealerTurn = useCallback(() => {
+        let tempDealerHand = dealerHand.cards.map(c => ({ ...c, isHidden: false }));
         
-        let currentHand = revealedDealerHand.cards;
-        
-        const playDealerHand = () => {
-            let scoreInfo = calculateScore(currentHand);
+        const drawLoop = (currentHand) => {
+            const scoreInfo = calculateScore(currentHand);
             if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
-                dealCard(currentHand);
-                setDealerHand({ cards: [...currentHand], ...calculateScore(currentHand) });
-                setTimeout(playDealerHand, 1000);
+                const newCard = dealCardFromDeck();
+                const nextHand = [...currentHand, newCard];
+                setDealerHand({ cards: nextHand, ...calculateScore(nextHand) });
+                setTimeout(() => drawLoop(nextHand), 1000);
             } else {
                 const finalDealerScore = scoreInfo.score;
                 let finalMessage = '';
@@ -398,24 +360,39 @@ export default function App() {
             }
         };
 
-        setTimeout(playDealerHand, 1000);
+        setDealerHand(prev => ({ ...prev, cards: tempDealerHand }));
+        setTimeout(() => drawLoop(tempDealerHand), 1000);
+    }, [dealCardFromDeck, calculateScore, playerHands, dealerHand.cards]);
 
-    }, [gameState, dealCard, calculateScore, gameMode]);
+    useEffect(() => {
+        if (gameState === 'dealer-turn') {
+            playDealerTurn();
+        }
+    }, [gameState, playDealerTurn]);
 
     // Auto-deal after round ends
     useEffect(() => {
-        if (gameState === 'end') {
+        if (gameState === 'end' && !endOfRoundMessageSet.current) {
+            endOfRoundMessageSet.current = true;
             setMessage(prev => prev + "Next round in 5 seconds...");
-            const timerId = setTimeout(() => {
-                dealNewGame();
-            }, 5000);
+            const timerId = setTimeout(dealNewGame, 5000);
             setAutoDealTimer(timerId);
             return () => clearTimeout(timerId);
         }
     }, [gameState, dealNewGame]);
 
-    // --- RENDER LOGIC ---
+    // Auto-clear feedback message
+    useEffect(() => {
+        if (feedback) {
+            const timer = setTimeout(() => {
+                setFeedback('');
+            }, 1500); // Clears feedback after 1.5 seconds
+            return () => clearTimeout(timer);
+        }
+    }, [feedback]);
 
+
+    // --- RENDER LOGIC ---
     const selectMode = (mode) => {
         setGameMode(mode);
         createShoe();
@@ -498,7 +475,7 @@ export default function App() {
 
                     {/* Feedback Area */}
                     <div className="text-center my-2 h-16 flex items-center justify-center">
-                        <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg">{message || feedback}</p>
+                        <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg">{feedback || message}</p>
                     </div>
 
                     {/* Player Area */}
