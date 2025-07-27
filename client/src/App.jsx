@@ -150,18 +150,20 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
-const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount }) => {
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, playerBjCount, dealerBjCount }) => {
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
         <div className="fixed top-4 right-4 w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20">
             <h3 className="text-lg font-bold border-b border-gray-600 pb-2 mb-2 flex justify-between">
                 <span>History</span>
-                <span className="flex items-center gap-2 text-base">
+                <span className="flex items-center gap-2 text-base flex-wrap justify-end">
                     <span className="text-blue-400">W:{winCount}</span>
                     <span className="text-orange-400">L:{lossCount}</span>
                     <span className="text-green-400">✅{correctCount}</span>
                     <span className="text-red-400">❌{incorrectCount}</span>
+                    <span className="text-yellow-400">P-BJ:{playerBjCount}</span>
+                    <span className="text-purple-400">D-BJ:{dealerBjCount}</span>
                 </span>
             </h3>
             <ul className="space-y-2">
@@ -219,6 +221,8 @@ export default function App() {
     const [incorrectCount, setIncorrectCount] = useState(0);
     const [winCount, setWinCount] = useState(0);
     const [lossCount, setLossCount] = useState(0);
+    const [playerBjCount, setPlayerBjCount] = useState(0);
+    const [dealerBjCount, setDealerBjCount] = useState(0);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
@@ -297,6 +301,8 @@ export default function App() {
             setIncorrectCount(0);
             setWinCount(0);
             setLossCount(0);
+            setPlayerBjCount(0);
+            setDealerBjCount(0);
             setTimeout(() => setGameState('pre-deal'), 100);
             return;
         }
@@ -326,13 +332,11 @@ export default function App() {
                 const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
                 setPlayerHands([playerInitialState]);
                 setDealerHand({ cards: tempDealerHand, ...calculateScore(tempDealerHand) });
+                
+                const playerHasBj = playerInitialState.score === 21;
+                const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
 
-                if (playerInitialState.score === 21) {
-                    setMessage('Blackjack! You win!');
-                    setGameState('end');
-                } else if (calculateScore(tempDealerHand.map(c => ({...c, isHidden: false}))).score === 21) {
-                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
-                    setMessage('Dealer has Blackjack. You lose.');
+                if (playerHasBj || dealerHasBj) {
                     setGameState('end');
                 }
             }
@@ -513,40 +517,55 @@ export default function App() {
     // Determine winner at the end of the round
     useEffect(() => {
         if (gameState === 'end' && playerHands[0].cards.length > 0) {
-            const dealerScore = calculateScore(dealerHand.cards.filter(c => c)).score;
+            const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
+            const dealerScoreInfo = calculateScore(revealedDealerHand);
+            
+            const playerHasBj = playerHands.length === 1 && playerHands[0].cards.length === 2 && playerHands[0].score === 21;
+            const dealerHasBj = dealerScoreInfo.score === 21 && revealedDealerHand.length === 2;
+
             let resultMessage = '';
             let handWins = 0;
             let handLosses = 0;
 
-            playerHands.forEach((hand, index) => {
-                resultMessage += `Hand ${index + 1}: `;
-                if (hand.status === 'bust') {
-                    resultMessage += 'You lose (Busted). ';
-                    handLosses++;
-                } else if (dealerScore > 21) {
-                    resultMessage += 'You win (Dealer Busted). ';
-                    handWins++;
-                } else if (hand.score > dealerScore) {
-                    resultMessage += 'You win (Higher Score). ';
-                    handWins++;
-                } else if (hand.score < dealerScore) {
-                    resultMessage += 'You lose (Lower Score). ';
-                    handLosses++;
-                } else {
-                    resultMessage += 'Push. ';
-                }
-            });
-
-            if (handWins > handLosses) {
+            if (playerHasBj && !dealerHasBj) {
+                resultMessage = 'Blackjack! You win.';
                 setWinCount(prev => prev + 1);
-            } else if (handLosses > handWins) {
+                setPlayerBjCount(prev => prev + 1);
+            } else if (dealerHasBj && !playerHasBj) {
+                resultMessage = 'Dealer has Blackjack. You lose.';
                 setLossCount(prev => prev + 1);
-            }
+                setDealerBjCount(prev => prev + 1);
+            } else if (dealerHasBj && playerHasBj) {
+                resultMessage = 'Push (Both have Blackjack).';
+            } else {
+                 playerHands.forEach((hand, index) => {
+                    resultMessage += `Hand ${index + 1}: `;
+                    if (hand.status === 'bust') {
+                        resultMessage += 'You lose (Busted). ';
+                        handLosses++;
+                    } else if (dealerScoreInfo.score > 21) {
+                        resultMessage += 'You win (Dealer Busted). ';
+                        handWins++;
+                    } else if (hand.score > dealerScoreInfo.score) {
+                        resultMessage += 'You win (Higher Score). ';
+                        handWins++;
+                    } else if (hand.score < dealerScoreInfo.score) {
+                        resultMessage += 'You lose (Lower Score). ';
+                        handLosses++;
+                    } else {
+                        resultMessage += 'Push. ';
+                    }
+                });
 
+                if (handWins > handLosses) setWinCount(prev => prev + 1);
+                else if (handLosses > handWins) setLossCount(prev => prev + 1);
+            }
+            
+            setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
             const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
             setMessage(finalMessage);
         }
-    }, [gameState, playerHands, dealerHand, calculateScore]);
+    }, [gameState, playerHands, dealerHand.cards, calculateScore]);
 
     // Auto-deal timer logic
     const dealCallback = useRef(dealNewGame);
@@ -579,6 +598,8 @@ export default function App() {
         setIncorrectCount(0);
         setWinCount(0);
         setLossCount(0);
+        setPlayerBjCount(0);
+        setDealerBjCount(0);
         if (mode === 'solo') {
             setGameState('pre-deal');
             setMessage('Solo Mode: Press Deal to start.');
@@ -627,7 +648,7 @@ export default function App() {
 
     return (
         <div className={`min-h-screen font-sans p-4 flex flex-col items-center transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
-            {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} />}
+            {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} />}
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <div className="w-full max-w-7xl mx-auto">
                 {/* Header */}
