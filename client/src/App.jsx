@@ -304,6 +304,10 @@ export default function App() {
         if (highScore > 21) {
             return { score: lowScore, isSoft: false, display: `${lowScore}` };
         } else {
+            if (highScore >= 18) { // For A-7, A-8, A-9
+                 return { score: highScore, isSoft: true, display: `${highScore}` };
+            }
+            // For A-A (2/12) through A-6 (7/17)
             return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
         }
     }, []);
