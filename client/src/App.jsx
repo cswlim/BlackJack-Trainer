@@ -28,6 +28,7 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
 
     const player = calculateScore(playerHand);
     const dealerValue = handValue(dealerUpCard);
+    const canDouble = playerHand.length === 2;
 
     // PAIR SPLITTING LOGIC from the chart
     if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
@@ -46,7 +47,7 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
             return 'H'; // Hit against 7-A
         }
         if (rank === '5') { // This is treated as a hard 10
-            if (dealerValue <= 9) return 'D';
+            if (dealerValue <= 9) return canDouble ? 'D' : 'H';
             return 'H';
         }
         if (rank === '4') {
@@ -70,11 +71,11 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         }
         if (softTotal === 17) return 'H'; // A-6 always hits
         if (softTotal === 16 || softTotal === 15) { // A-5, A-4
-             if ([4,5,6].includes(dealerValue)) return 'D';
+             if ([4,5,6].includes(dealerValue)) return canDouble ? 'D' : 'H';
              return 'H';
         }
         if (softTotal === 14 || softTotal === 13) { // A-3, A-2
-             if ([5,6].includes(dealerValue)) return 'D';
+             if ([5,6].includes(dealerValue)) return canDouble ? 'D' : 'H';
              return 'H';
         }
     }
@@ -90,13 +91,13 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         if ([4, 5, 6].includes(dealerValue)) return 'S';
         return 'H';
     }
-    if (hardTotal === 11) return 'D';
+    if (hardTotal === 11) return canDouble ? 'D' : 'H';
     if (hardTotal === 10) {
-        if (dealerValue <= 9) return 'D';
+        if (dealerValue <= 9) return canDouble ? 'D' : 'H';
         return 'H';
     }
     if (hardTotal === 9) {
-        if (dealerValue >= 3 && dealerValue <= 6) return 'D';
+        if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
         return 'H';
     }
     // 5-8
@@ -155,17 +156,23 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
     
     return (
         <div className="fixed top-4 right-4 w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20">
-            <h3 className="text-lg font-bold border-b border-gray-600 pb-2 mb-2 flex justify-between">
-                <span>History</span>
-                <span className="flex items-center gap-2 text-base flex-wrap justify-end">
-                    <span className="text-blue-400">W:{winCount}</span>
-                    <span className="text-orange-400">L:{lossCount}</span>
-                    <span className="text-green-400">✅{correctCount}</span>
-                    <span className="text-red-400">❌{incorrectCount}</span>
-                    <span className="text-yellow-400">P-BJ:{playerBjCount}</span>
-                    <span className="text-purple-400">D-BJ:{dealerBjCount}</span>
-                </span>
-            </h3>
+            <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
+                <h3 className="text-lg font-bold">History</h3>
+                <div className="flex flex-col items-end text-sm space-y-1">
+                    <div className="flex gap-3">
+                        <span className="text-blue-400">W: {winCount}</span>
+                        <span className="text-orange-400">L: {lossCount}</span>
+                    </div>
+                    <div className="flex gap-3">
+                        <span className="text-green-400">✅ {correctCount}</span>
+                        <span className="text-red-400">❌ {incorrectCount}</span>
+                    </div>
+                    <div className="flex gap-3">
+                        <span className="text-yellow-400">P-BJ: {playerBjCount}</span>
+                        <span className="text-purple-400">D-BJ: {dealerBjCount}</span>
+                    </div>
+                </div>
+            </div>
             <ul className="space-y-2">
                 {history.slice(0, 5).map((item, index) => (
                     <li key={index} className={`text-sm transition-opacity duration-300 ${opacities[index] || 'opacity-0'}`}>
