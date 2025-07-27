@@ -117,14 +117,14 @@ const getCardCountValue = (card) => {
 
 const Card = ({ suit, rank, isHidden, isCutCard }) => {
     if (isCutCard) {
-        return <div className="w-28 h-40 md:w-32 md:h-44 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold">CUT</div>;
+        return <div className="w-24 h-36 md:w-32 md:h-44 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold">CUT</div>;
     }
     if (isHidden) {
-        return <div className="w-28 h-40 md:w-32 md:h-44 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-24 h-36 md:w-28 md:h-40 bg-gray-600 rounded-md"></div></div>;
+        return <div className="w-24 h-36 md:w-32 md:h-44 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-20 h-32 md:w-28 md:h-40 bg-gray-600 rounded-md"></div></div>;
     }
     const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
     return (
-        <div className="relative w-28 h-40 md:w-32 md:h-44 bg-white rounded-lg border border-gray-200 shadow-md p-2 transition-all transform animate-deal">
+        <div className="relative w-24 h-36 md:w-32 md:h-44 bg-white rounded-lg border border-gray-200 shadow-md p-2 transition-all transform animate-deal">
             <div className={`absolute top-1 left-2 text-center leading-none ${suitColor}`}>
                 <p className="text-2xl font-bold">{rank}</p>
                 <p className="text-xl">{suit}</p>
@@ -184,7 +184,13 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
             <ul className="space-y-2">
                 {history.slice(0, 5).map((item, index) => (
                     <li key={index} className={`text-sm transition-opacity duration-300 ${opacities[index] || 'opacity-0'}`}>
-                        <span className={item.correct ? 'text-green-400' : 'text-red-400'}>{item.correct ? '✅' : '❌'}</span> {item.text}
+                        {item.isResult ? (
+                            <span className="font-bold text-yellow-300">{item.text}</span>
+                        ) : (
+                            <>
+                                <span className={item.correct ? 'text-green-400' : 'text-red-400'}>{item.correct ? '✅' : '❌'}</span> {item.text}
+                            </>
+                        )}
                     </li>
                 ))}
             </ul>
@@ -218,9 +224,9 @@ export default function App() {
     const [gameState, setGameState] = useState('pre-game'); // 'pre-game', 'pre-deal', 'player-turn', 'dealer-turn', 'end'
     
     // Player & Dealer state
-    const [playerHands, setPlayerHands] = useState([ { cards: [], score: 0, isSoft: false, status: 'playing' } ]);
+    const [playerHands, setPlayerHands] = useState([ { cards: [], score: 0, isSoft: false, display: '0' } ]);
     const [activeHandIndex, setActiveHandIndex] = useState(0);
-    const [dealerHand, setDealerHand] = useState({ cards: [], score: 0, isSoft: false });
+    const [dealerHand, setDealerHand] = useState({ cards: [], score: 0, isSoft: false, display: '0' });
     
     // Counting mode state
     const [tableHands, setTableHands] = useState([]);
@@ -271,24 +277,31 @@ export default function App() {
 
     // --- HAND SCORE CALCULATION ---
     const calculateScore = useCallback((hand) => {
-        let score = 0;
+        let scoreWithoutAces = 0;
         let aceCount = 0;
         hand.forEach(card => {
+            if (!card) return;
             if (card.rank === 'A') {
                 aceCount++;
-                score += 11;
             } else if (['J', 'Q', 'K'].includes(card.rank)) {
-                score += 10;
+                scoreWithoutAces += 10;
             } else {
-                score += parseInt(card.rank);
+                scoreWithoutAces += parseInt(card.rank);
             }
         });
-        while (score > 21 && aceCount > 0) {
-            score -= 10;
-            aceCount--;
+
+        if (aceCount === 0) {
+            return { score: scoreWithoutAces, isSoft: false, display: `${scoreWithoutAces}` };
         }
-        // A hand is soft if an Ace is counted as 11
-        return { score, isSoft: aceCount > 0 && score <= 21 };
+
+        const lowScore = scoreWithoutAces + aceCount;
+        const highScore = lowScore + 10;
+
+        if (highScore > 21) {
+            return { score: lowScore, isSoft: false, display: `${lowScore}` };
+        } else {
+            return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
+        }
     }, []);
 
     // --- ATOMIC CARD DEALING ---
@@ -345,7 +358,7 @@ export default function App() {
 
                 const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
                 setPlayerHands([playerInitialState]);
-                setDealerHand({ cards: tempDealerHand, ...calculateScore(tempDealerHand) });
+                setDealerHand({ cards: tempDealerHand });
                 
                 const playerHasBj = playerInitialState.score === 21;
                 const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
@@ -371,7 +384,8 @@ export default function App() {
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
         const isCorrect = actionCode === correctMove;
-        const feedbackText = `Your move: ${actionName}. Strategy: ${correctMove}.`;
+        const handInfo = `Hand (${currentHandRef.display}): `;
+        const feedbackText = `${handInfo}Your move: ${actionName}. Strategy: ${correctMove}.`;
         const historyItem = { text: feedbackText, correct: isCorrect };
 
         setHistory(prevHistory => [historyItem, ...prevHistory]);
@@ -595,6 +609,7 @@ export default function App() {
             setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
             const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
             setMessage(finalMessage);
+            setHistory(prev => [{ text: resultMessage, isResult: true }, ...prev]);
         }
     }, [gameState, playerHands, dealerHand.cards, calculateScore]);
 
@@ -694,17 +709,17 @@ export default function App() {
                     </header>
 
                     {/* Game Table */}
-                    <div className="bg-green-700 border-4 border-green-800 rounded-3xl shadow-xl p-4 md:p-6 text-white">
+                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-4 md:p-6 text-white">
                         {/* Dealer's Hand */}
-                        <div className="text-center mb-4">
-                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand ({gameState === 'player-turn' || (gameState === 'end' && playerHands.some(h => h.status === 'bust')) ? '?' : dealerHand.score})</h2>
-                            <div className="flex justify-center items-center space-x-2 min-h-[180px]">
+                        <div className="text-center mb-2">
+                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand ({gameState === 'player-turn' || (gameState === 'end' && playerHands.some(h => h.status === 'bust')) ? '?' : dealerHand.display || ' '})</h2>
+                            <div className="flex justify-center items-center space-x-2 min-h-[172px] md:min-h-[188px]">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
                         </div>
 
                         {/* Feedback and Deal Button Area */}
-                        <div className="text-center my-2 h-16 flex items-center justify-center">
+                        <div className="text-center my-1 h-16 flex items-center justify-center">
                             {(gameState === 'pre-deal' || gameState === 'end') && 
                                 <button 
                                     onClick={dealNewGame} 
@@ -728,8 +743,8 @@ export default function App() {
                                 <div className="flex justify-center items-start space-x-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <h3 className="font-bold">Hand {i+1}: {hand.score} {hand.status !== 'playing' && `(${hand.status})`}</h3>
-                                            <div className="flex justify-center items-center space-x-2 mt-2 min-h-[180px]">
+                                            <h3 className="font-bold">Hand {i+1}: {hand.display} {hand.status !== 'playing' && `(${hand.status})`}</h3>
+                                            <div className="flex justify-center items-center space-x-2 mt-2 min-h-[172px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
                                         </div>
@@ -757,7 +772,7 @@ export default function App() {
                     </div>
                     
                     {/* Action Buttons */}
-                    <div className="mt-6 flex justify-center space-x-2 md:space-x-4">
+                    <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
                          {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
                              <button
                                  key={actionName}
