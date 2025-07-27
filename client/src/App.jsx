@@ -117,24 +117,24 @@ const getCardCountValue = (card) => {
 
 const Card = ({ suit, rank, isHidden, isCutCard }) => {
     if (isCutCard) {
-        return <div className="w-24 h-36 md:w-28 md:h-40 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold">CUT</div>;
+        return <div className="w-28 h-40 md:w-32 md:h-44 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold">CUT</div>;
     }
     if (isHidden) {
-        return <div className="w-24 h-36 md:w-28 md:h-40 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-20 h-32 md:w-24 md:h-36 bg-gray-600 rounded-md"></div></div>;
+        return <div className="w-28 h-40 md:w-32 md:h-44 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-24 h-36 md:w-28 md:h-40 bg-gray-600 rounded-md"></div></div>;
     }
     const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
     return (
-        <div className="relative w-24 h-36 md:w-28 md:h-40 bg-white rounded-lg border border-gray-200 shadow-md p-2 transition-all transform animate-deal">
+        <div className="relative w-28 h-40 md:w-32 md:h-44 bg-white rounded-lg border border-gray-200 shadow-md p-2 transition-all transform animate-deal">
             <div className={`absolute top-1 left-2 text-center leading-none ${suitColor}`}>
-                <p className="text-xl font-bold">{rank}</p>
-                <p className="text-lg">{suit}</p>
+                <p className="text-2xl font-bold">{rank}</p>
+                <p className="text-xl">{suit}</p>
             </div>
-            <div className={`absolute inset-0 flex items-center justify-center text-5xl ${suitColor}`}>
+            <div className={`absolute inset-0 flex items-center justify-center text-6xl ${suitColor}`}>
                 {suit}
             </div>
             <div className={`absolute bottom-1 right-2 text-center leading-none rotate-180 ${suitColor}`}>
-                <p className="text-xl font-bold">{rank}</p>
-                <p className="text-lg">{suit}</p>
+                <p className="text-2xl font-bold">{rank}</p>
+                <p className="text-xl">{suit}</p>
             </div>
         </div>
     );
@@ -163,7 +163,7 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
-        <div className="fixed top-4 right-4 w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20">
+        <div className="w-full md:w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 mt-4 md:mt-0 md:fixed md:top-4 md:right-4">
             <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
                 <h3 className="text-lg font-bold">History</h3>
                 <div className="flex flex-col items-end text-sm space-y-1">
@@ -679,108 +679,114 @@ export default function App() {
     }
 
     return (
-        <div className={`min-h-screen font-sans p-4 flex flex-col items-center transition-colors duration-300 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
-            {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} />}
-            {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
-            <div className="w-full max-w-7xl mx-auto">
-                {/* Header */}
-                <header className="flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-6">
-                        <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
-                        <div className="flex items-center gap-4">
-                           <Toggle isEnabled={autoDeal} onToggle={() => setAutoDeal(!autoDeal)} labelOn="Auto" labelOff="Manual"/>
-                           <Toggle isEnabled={theme === 'dark'} onToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')} labelOn="Dark" labelOff="Light"/>
-                        </div>
-                    </div>
-                    {gameState === 'pre-deal' || gameState === 'end' ? (
-                        <button 
-                            onClick={dealNewGame} 
-                            className="bg-blue-500 text-white font-semibold px-6 py-3 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400"
-                            disabled={gameState === 'end' && autoDeal}
-                        >
-                            {gameState === 'end' && autoDeal ? 'Dealing...' : 'Deal'}
-                        </button>
-                    ) : <div className="w-28 h-12"></div>}
-                </header>
-
-                {/* Game Table */}
-                <div className="bg-green-700 border-4 border-green-800 rounded-3xl shadow-xl p-4 md:p-6 text-white">
-                    {/* Dealer's Hand */}
-                    <div className="text-center mb-4">
-                        <h2 className="text-xl font-semibold mb-2">Dealer's Hand ({gameState === 'player-turn' || (gameState === 'end' && playerHands.some(h => h.status === 'bust')) ? '?' : dealerHand.score})</h2>
-                        <div className="flex justify-center items-center space-x-2 min-h-[160px] md:min-h-[176px]">
-                            {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
-                        </div>
-                    </div>
-
-                    {/* Feedback Area */}
-                    <div className="text-center my-2 h-16 flex items-center justify-center">
-                        {(feedback || message) &&
-                            <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
-                                {feedback || message}
-                            </p>
-                        }
-                    </div>
-
-                    {/* Player Area */}
-                    {gameMode === 'solo' ? (
-                        <div className="text-center">
-                            <h2 className="text-xl font-semibold mb-2">Your Hand(s)</h2>
-                            <div className="flex justify-center items-start space-x-4">
-                                {playerHands.map((hand, i) => (
-                                    <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                        <h3 className="font-bold">Hand {i+1}: {hand.score} {hand.status !== 'playing' && `(${hand.status})`}</h3>
-                                        <div className="flex justify-center items-center space-x-2 mt-2 min-h-[160px] md:min-h-[176px]">
-                                            {hand.cards.map((card, j) => <Card key={j} {...card} />)}
-                                        </div>
-                                    </div>
-                                ))}
+        <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
+            <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
+                <div className="flex-grow">
+                    {/* Header */}
+                    <header className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-6">
+                            <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
+                            <div className="flex items-center gap-4">
+                               <Toggle isEnabled={autoDeal} onToggle={() => setAutoDeal(!autoDeal)} labelOn="Auto" labelOff="Manual"/>
+                               <Toggle isEnabled={theme === 'dark'} onToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')} labelOn="Dark" labelOff="Light"/>
                             </div>
                         </div>
-                    ) : (
-                         <div className="text-center">
-                            <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
-                            <div className="grid grid-cols-4 gap-4">
-                                {tableHands.map((hand, i) => (
-                                    <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                        <h3 className="font-bold">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.score}</h3>
-                                        <div className="flex justify-center items-center space-x-1 mt-1">
-                                            {hand.cards.map((card, j) => <div key={j} className="transform scale-75"><Card {...card} /></div>)}
+                    </header>
+
+                    {/* Game Table */}
+                    <div className="bg-green-700 border-4 border-green-800 rounded-3xl shadow-xl p-4 md:p-6 text-white">
+                        {/* Dealer's Hand */}
+                        <div className="text-center mb-4">
+                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand ({gameState === 'player-turn' || (gameState === 'end' && playerHands.some(h => h.status === 'bust')) ? '?' : dealerHand.score})</h2>
+                            <div className="flex justify-center items-center space-x-2 min-h-[180px]">
+                                {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
+                            </div>
+                        </div>
+
+                        {/* Feedback and Deal Button Area */}
+                        <div className="text-center my-2 h-16 flex items-center justify-center">
+                            {(gameState === 'pre-deal' || gameState === 'end') && 
+                                <button 
+                                    onClick={dealNewGame} 
+                                    className="bg-blue-500 text-white font-semibold px-8 py-4 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400 text-xl"
+                                    disabled={gameState === 'end' && autoDeal}
+                                >
+                                    {gameState === 'end' && autoDeal ? 'Dealing...' : 'Deal'}
+                                </button>
+                            }
+                            {(feedback || message) && gameState !== 'pre-deal' && gameState !== 'end' &&
+                                <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
+                                    {feedback || message}
+                                </p>
+                            }
+                        </div>
+
+                        {/* Player Area */}
+                        {gameMode === 'solo' ? (
+                            <div className="text-center">
+                                <h2 className="text-xl font-semibold mb-2">Your Hand(s)</h2>
+                                <div className="flex justify-center items-start space-x-4">
+                                    {playerHands.map((hand, i) => (
+                                        <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
+                                            <h3 className="font-bold">Hand {i+1}: {hand.score} {hand.status !== 'playing' && `(${hand.status})`}</h3>
+                                            <div className="flex justify-center items-center space-x-2 mt-2 min-h-[180px]">
+                                                {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                                <div className={`p-2 rounded-lg col-start-4`}>
-                                    {isCutCardRevealed && <div className="transform scale-75"><Card isCutCard={true} /></div>}
+                                    ))}
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                             <div className="text-center">
+                                <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
+                                <div className="grid grid-cols-4 gap-4">
+                                    {tableHands.map((hand, i) => (
+                                        <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
+                                            <h3 className="font-bold">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.score}</h3>
+                                            <div className="flex justify-center items-center space-x-1 mt-1">
+                                                {hand.cards.map((card, j) => <div key={j} className="transform scale-75"><Card {...card} /></div>)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className={`p-2 rounded-lg col-start-4`}>
+                                        {isCutCardRevealed && <div className="transform scale-75"><Card isCutCard={true} /></div>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="mt-6 flex justify-center space-x-2 md:space-x-4">
+                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
+                             <button
+                                 key={actionName}
+                                 onClick={() => {
+                                     if (gameMode === 'counting' && actionCode !== 'S') {
+                                         setShowCountPrompt(true);
+                                     }
+                                     handlePlayerAction(actionCode, actionName);
+                                 }}
+                                 disabled={gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
+                                 className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                     ${actionCode === 'H' && 'bg-green-500 text-white'}
+                                     ${actionCode === 'S' && 'bg-red-500 text-white'}
+                                     ${actionCode === 'D' && 'bg-orange-400 text-white'}
+                                     ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
+                             >
+                                 {actionName}
+                             </button>
+                         ))}
+                    </div>
                 </div>
-                
-                {/* Action Buttons */}
-                <div className="mt-6 flex justify-center space-x-2 md:space-x-4">
-                     {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
-                         <button
-                             key={actionName}
-                             onClick={() => {
-                                 if (gameMode === 'counting' && actionCode !== 'S') {
-                                     setShowCountPrompt(true);
-                                 }
-                                 handlePlayerAction(actionCode, actionName);
-                             }}
-                             disabled={gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                             className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
-                                 ${actionCode === 'H' && 'bg-green-500 text-white'}
-                                 ${actionCode === 'S' && 'bg-red-500 text-white'}
-                                 ${actionCode === 'D' && 'bg-orange-400 text-white'}
-                                 ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
-                         >
-                             {actionName}
-                         </button>
-                     ))}
-                </div>
+                {gameMode === 'solo' && <div className="w-full md:w-64"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} /></div>}
             </div>
+            {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+                body {
+                    font-family: 'Nunito', sans-serif;
+                }
                 @keyframes deal {
                     from { opacity: 0; transform: translateY(-20px) scale(0.8); }
                     to { opacity: 1; transform: translateY(0) scale(1); }
