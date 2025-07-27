@@ -129,7 +129,7 @@ const Card = ({ suit, rank, isHidden, isCutCard }) => {
                 <p className="text-2xl font-bold">{rank}</p>
                 <p className="text-xl">{suit}</p>
             </div>
-            <div className={`absolute inset-0 flex items-center justify-center text-6xl ${suitColor}`}>
+            <div className={`absolute inset-0 flex items-center justify-center text-5xl md:text-6xl ${suitColor}`}>
                 {suit}
             </div>
             <div className={`absolute bottom-1 right-2 text-center leading-none rotate-180 ${suitColor}`}>
@@ -424,9 +424,23 @@ export default function App() {
             }
             case 'P': {
                 const handToSplit = playerHands[activeHandIndex].cards;
-                const hand1 = { cards: [handToSplit[0]], status: 'playing' };
-                const hand2 = { cards: [handToSplit[1]], status: 'playing' };
-                setPlayerHands([hand1, hand2]);
+                const isAces = handToSplit[0].rank === 'A';
+                
+                if (isAces) {
+                    dealCard(card1 => {
+                        dealCard(card2 => {
+                            const hand1 = { cards: [handToSplit[0], card1], status: 'stood' };
+                            const hand2 = { cards: [handToSplit[1], card2], status: 'stood' };
+                            Object.assign(hand1, calculateScore(hand1.cards));
+                            Object.assign(hand2, calculateScore(hand2.cards));
+                            setPlayerHands([hand1, hand2]);
+                        });
+                    });
+                } else {
+                    const hand1 = { cards: [handToSplit[0]], status: 'playing' };
+                    const hand2 = { cards: [handToSplit[1]], status: 'playing' };
+                    setPlayerHands([hand1, hand2]);
+                }
                 break;
             }
             default: break;
@@ -709,11 +723,11 @@ export default function App() {
                     </header>
 
                     {/* Game Table */}
-                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-4 md:p-6 text-white">
+                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
                         {/* Dealer's Hand */}
                         <div className="text-center mb-2">
                             <h2 className="text-xl font-semibold mb-2">Dealer's Hand ({gameState === 'player-turn' || (gameState === 'end' && playerHands.some(h => h.status === 'bust')) ? '?' : dealerHand.display || ' '})</h2>
-                            <div className="flex justify-center items-center space-x-2 min-h-[172px] md:min-h-[188px]">
+                            <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
                         </div>
@@ -744,7 +758,7 @@ export default function App() {
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
                                             <h3 className="font-bold">Hand {i+1}: {hand.display} {hand.status !== 'playing' && `(${hand.status})`}</h3>
-                                            <div className="flex justify-center items-center space-x-2 mt-2 min-h-[172px] md:min-h-[188px]">
+                                            <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
                                         </div>
