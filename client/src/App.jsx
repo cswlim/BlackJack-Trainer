@@ -730,7 +730,7 @@ export default function App() {
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
                         {/* Dealer's Hand */}
                         <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand ({gameState === 'player-turn' || (gameState === 'end' && playerHands.some(h => h.status === 'bust')) ? '?' : dealerHand.display || ' '})</h2>
+                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && `(${dealerHand.display || ' '})`}</h2>
                             <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
