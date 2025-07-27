@@ -144,13 +144,13 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     const [count, setCount] = useState('');
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-100 dark:bg-gray-700 p-6 rounded-xl shadow-2xl w-80 text-center transition-colors duration-300">
-                <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100 transition-colors duration-300">What's the Running Count?</h3>
+            <div className="bg-gray-700 p-6 rounded-xl shadow-2xl w-80 text-center">
+                <h3 className="text-xl font-bold mb-4 text-gray-100">What's the Running Count?</h3>
                 <input
                     type="number"
                     value={count}
                     onChange={(e) => setCount(e.target.value)}
-                    className="w-full p-3 text-center text-2xl font-mono bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg mb-4 text-gray-800 dark:text-gray-100 transition-colors duration-300"
+                    className="w-full p-3 text-center text-2xl font-mono bg-gray-800 border border-gray-600 rounded-lg mb-4 text-gray-100"
                     autoFocus
                 />
                 <button onClick={() => onConfirm(parseInt(count))} className="w-full bg-blue-500 text-white font-semibold py-3 rounded-lg hover:bg-blue-600 transition">Confirm</button>
@@ -200,8 +200,8 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
 
 const Toggle = ({ isEnabled, onToggle, labelOn, labelOff }) => (
     <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 transition-colors duration-300">{isEnabled ? labelOn : labelOff}</span>
-        <button onClick={onToggle} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ${isEnabled ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+        <span className="text-sm font-medium text-gray-400">{isEnabled ? labelOn : labelOff}</span>
+        <button onClick={onToggle} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ${isEnabled ? 'bg-blue-500' : 'bg-gray-600'}`}>
             <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ${isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
     </div>
@@ -213,7 +213,6 @@ const Toggle = ({ isEnabled, onToggle, labelOn, labelOff }) => (
 export default function App() {
     // Game settings
     const [gameMode, setGameMode] = useState(null); // 'solo', 'counting'
-    const [theme, setTheme] = useState('light');
     const [autoDeal, setAutoDeal] = useState(true);
     const NUM_DECKS = 6;
 
@@ -457,16 +456,6 @@ export default function App() {
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
-    // Theme toggler effect
-    useEffect(() => {
-        const root = window.document.documentElement;
-        if (theme === 'dark') {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-    }, [theme]);
-    
     // Automatically deal a second card to a newly split hand
     useEffect(() => {
         if (gameState !== 'player-turn') return;
@@ -704,9 +693,9 @@ export default function App() {
 
     if (!gameMode) {
         return (
-            <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-100 dark:bg-gray-900`}>
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 transition-colors duration-300">Blackjack Trainer</h1>
-                <p className="text-gray-600 dark:text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
+            <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-900`}>
+                <h1 className="text-4xl font-bold text-gray-100 transition-colors duration-300">Blackjack Trainer</h1>
+                <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
                 <div className="flex space-x-4">
                     <button onClick={() => selectMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Solo Mode</button>
                     <button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>
@@ -716,7 +705,7 @@ export default function App() {
     }
 
     return (
-        <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
+        <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
             <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
                 <div className="flex-grow">
                     {/* Header */}
@@ -725,7 +714,6 @@ export default function App() {
                             <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
                             <div className="flex items-center gap-4">
                                <Toggle isEnabled={autoDeal} onToggle={() => setAutoDeal(!autoDeal)} labelOn="Auto" labelOff="Manual"/>
-                               <Toggle isEnabled={theme === 'dark'} onToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')} labelOn="Dark" labelOff="Light"/>
                             </div>
                         </div>
                     </header>
@@ -734,7 +722,7 @@ export default function App() {
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
                         {/* Dealer's Hand */}
                         <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && `(${dealerHand.display || ' '})`}</h2>
+                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' ? dealerHand.display : ''}</h2>
                             <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
@@ -765,7 +753,7 @@ export default function App() {
                                 <div className="flex justify-center items-start space-x-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <h3 className="font-bold">Hand {i+1}: {hand.display} {hand.status !== 'playing' && `(${hand.status})`}</h3>
+                                            <h3 className="font-bold">{hand.display} {hand.status !== 'playing' && `(${hand.status})`}</h3>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
