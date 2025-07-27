@@ -23,7 +23,7 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
             score -= 10;
             aceCount--;
         }
-        return { score, isSoft: aceCount > 0 && (score + 10 <= 21 || score - 10 > 0) };
+        return { score, isSoft: aceCount > 0 && (score - 10) < 11 };
     };
 
     const player = calculateScore(playerHand);
@@ -268,7 +268,8 @@ export default function App() {
             score -= 10;
             aceCount--;
         }
-        return { score, isSoft: aceCount > 0 && score + 10 <= 21 };
+        // A hand is soft if an Ace is counted as 11
+        return { score, isSoft: aceCount > 0 && score <= 21 };
     }, []);
 
     // --- ATOMIC CARD DEALING ---
@@ -555,7 +556,7 @@ export default function App() {
         let timerId;
         if (gameState === 'end' && !endOfRoundMessageSet.current && autoDeal) {
             endOfRoundMessageSet.current = true;
-            timerId = setTimeout(() => dealCallback.current(), 3500);
+            timerId = setTimeout(() => dealCallback.current(), 2500);
         }
         return () => clearTimeout(timerId);
     }, [gameState, autoDeal]);
