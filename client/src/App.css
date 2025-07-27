@@ -17,6 +17,8 @@ body, html {
   min-height: 100vh;
   padding: 2rem;
   box-sizing: border-box;
+  position: relative;
+  overflow-x: hidden;
 }
 
 .header {
@@ -54,11 +56,24 @@ body, html {
 .hands {
   text-align: center;
   margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+  max-width: 600px;
 }
 
 .hand {
   font-size: 1.25rem;
   margin: 0.5rem 0;
+}
+
+.dealer-hand {
+  order: 0;
+}
+
+.player-hand {
+  order: 1;
 }
 
 .cards {
@@ -78,12 +93,23 @@ body, html {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   min-width: 40px;
   text-align: center;
+  opacity: 0;
+  transform: translateY(-20px);
+  animation: deal 0.4s ease forwards;
+}
+
+@keyframes deal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message {
   font-size: 1rem;
   color: #555;
   margin-top: 1rem;
+  min-height: 1.5rem;
 }
 
 .actions {
@@ -103,7 +129,7 @@ body, html {
   cursor: pointer;
   color: white;
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  transition: transform 0.1s ease;
+  transition: transform 0.1s ease, background-color 0.3s ease;
 }
 
 .action-button:active {
