@@ -92,17 +92,17 @@ body, html {
 }
 
 .hit {
-  background-color: #34c759;
+  background-color: #34c759; /* Green */
 }
 
 .stand {
-  background-color: #ff9500;
+  background-color: #ff3b30; /* Red */
 }
 
 .double {
-  background-color: #5856d6;
+  background-color: #ff9500; /* Orange */
 }
 
 .split {
-  background-color: #ff3b30;
+  background-color: #007aff; /* Blue */
 }
