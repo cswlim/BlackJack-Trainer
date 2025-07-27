@@ -132,8 +132,7 @@ export default function App() {
     // UI state
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
-    const [autoDealTimer, setAutoDealTimer] = useState(null);
-    const endOfRoundMessageSet = useRef(false); // Ref to prevent multiple end-of-round messages
+    const endOfRoundMessageSet = useRef(false);
 
     // --- DECK & SHOE LOGIC ---
     const createShoe = useCallback(() => {
@@ -184,9 +183,21 @@ export default function App() {
         return { score, isSoft: aceCount > 0 && score + 10 <= 21 };
     }, []);
 
+    // --- ATOMIC CARD DEALING ---
+    const dealCard = useCallback((callback) => {
+        setDeck(prevDeck => {
+            if (prevDeck.length === 0) {
+                callback(null); // No card to deal
+                return [];
+            }
+            const newDeck = [...prevDeck];
+            const card = newDeck.pop();
+            callback(card);
+            return newDeck;
+        });
+    }, []);
+
     const dealNewGame = useCallback(() => {
-        if (autoDealTimer) clearTimeout(autoDealTimer);
-        setAutoDealTimer(null);
         endOfRoundMessageSet.current = false;
 
         if (deck.length < 52 || isCutCardRevealed) {
@@ -195,40 +206,46 @@ export default function App() {
             return;
         }
 
-        const newDeck = [...deck];
+        let cardsToDeal = [];
+        let dealtCount = 0;
         
-        // Deal cards for solo mode
-        const playerCard1 = newDeck.pop();
-        const dealerCard1 = newDeck.pop();
-        const playerCard2 = newDeck.pop();
-        const dealerCard2 = newDeck.pop();
+        const dealInitialCards = () => {
+            if(dealtCount < 4) {
+                dealCard(card => {
+                    cardsToDeal.push(card);
+                    dealtCount++;
+                    dealInitialCards();
+                });
+            } else {
+                // All 4 cards have been dealt, now set the state
+                const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
+
+                setGameState('player-turn');
+                setMessage('');
+                setFeedback('');
+                setActiveHandIndex(0);
+
+                const tempPlayerHand = [playerCard1, playerCard2];
+                const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+
+                const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
+                setPlayerHands([playerInitialState]);
+                setDealerHand({ cards: tempDealerHand, ...calculateScore(tempDealerHand) });
+
+                if (playerInitialState.score === 21) {
+                    setMessage('Blackjack! You win!');
+                    setGameState('end');
+                } else if (calculateScore(tempDealerHand.map(c => ({...c, isHidden: false}))).score === 21) {
+                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
+                    setMessage('Dealer has Blackjack. You lose.');
+                    setGameState('end');
+                }
+            }
+        };
         
-        setDeck(newDeck); // Update the deck state once
+        dealInitialCards();
 
-        setGameState('player-turn');
-        setMessage('');
-        setFeedback('');
-        setActiveHandIndex(0);
-
-        const tempPlayerHand = [playerCard1, playerCard2];
-        const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
-
-        const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-        setPlayerHands([playerInitialState]);
-        setDealerHand({ cards: tempDealerHand, ...calculateScore(tempDealerHand) });
-
-        if (playerInitialState.score === 21) {
-            setMessage('Blackjack! You win!');
-            setGameState('end');
-        } else if (calculateScore(tempDealerHand.map(c => ({...c, isHidden: false}))).score === 21) {
-            setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
-            setMessage('Dealer has Blackjack. You lose.');
-            setGameState('end');
-        } else if (gameMode === 'counting') {
-            setShowCountPrompt(true);
-        }
-
-    }, [deck, isCutCardRevealed, createShoe, calculateScore, autoDealTimer, gameMode]);
+    }, [deck.length, isCutCardRevealed, createShoe, calculateScore, dealCard]);
     
     // Player Actions
     const handlePlayerAction = (action) => {
@@ -247,79 +264,65 @@ export default function App() {
         setFeedback(feedbackMsg);
 
         const newHands = JSON.parse(JSON.stringify(playerHands));
-        const newDeck = [...deck];
-
-        const dealOneCard = () => {
-            if (newDeck.length === 0) return null;
-            return newDeck.pop();
-        };
 
         switch(action) {
-            case 'Hit': {
-                const currentHand = newHands[activeHandIndex];
-                currentHand.cards.push(dealOneCard());
-                Object.assign(currentHand, calculateScore(currentHand.cards));
-                setPlayerHands(newHands);
+            case 'Hit':
+            case 'Double':
+                dealCard(card => {
+                    if(!card) return;
+                    const currentHand = newHands[activeHandIndex];
+                    currentHand.cards.push(card);
+                    Object.assign(currentHand, calculateScore(currentHand.cards));
+                    if(action === 'Double') currentHand.status = 'stood';
+                    setPlayerHands(newHands);
+                });
                 break;
-            }
             case 'Stand': {
                 const currentHand = newHands[activeHandIndex];
                 currentHand.status = 'stood';
-                if (activeHandIndex < newHands.length - 1) {
-                    setActiveHandIndex(activeHandIndex + 1);
-                } else {
-                    setGameState('dealer-turn');
-                }
-                setPlayerHands(newHands);
-                break;
-            }
-            case 'Double': {
-                const currentHand = newHands[activeHandIndex];
-                currentHand.cards.push(dealOneCard());
-                Object.assign(currentHand, calculateScore(currentHand.cards));
-                currentHand.status = 'stood';
-                if (activeHandIndex < newHands.length - 1) {
-                    setActiveHandIndex(activeHandIndex + 1);
-                } else {
-                    setGameState('dealer-turn');
-                }
                 setPlayerHands(newHands);
                 break;
             }
             case 'Split': {
-                const handToSplit = newHands[activeHandIndex].cards;
-                const hand1 = { cards: [handToSplit[0], dealOneCard()], status: 'playing' };
-                const hand2 = { cards: [handToSplit[1], dealOneCard()], status: 'playing' };
-                Object.assign(hand1, calculateScore(hand1.cards));
-                Object.assign(hand2, calculateScore(hand2.cards));
-                newHands.splice(activeHandIndex, 1, hand1, hand2);
-                setPlayerHands(newHands);
+                let cardsForSplit = [];
+                dealCard(card1 => {
+                    cardsForSplit.push(card1);
+                    dealCard(card2 => {
+                        cardsForSplit.push(card2);
+                        const handToSplit = newHands[activeHandIndex].cards;
+                        const hand1 = { cards: [handToSplit[0], cardsForSplit[0]], status: 'playing' };
+                        const hand2 = { cards: [handToSplit[1], cardsForSplit[1]], status: 'playing' };
+                        Object.assign(hand1, calculateScore(hand1.cards));
+                        Object.assign(hand2, calculateScore(hand2.cards));
+                        newHands.splice(activeHandIndex, 1, hand1, hand2);
+                        setPlayerHands(newHands);
+                    });
+                });
                 break;
             }
             default: break;
         }
-        setDeck(newDeck); // Update deck state after action
     };
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
-    // Check player hand status (busts, 21) after an action
+    // Check player hand status (busts, 21, or all hands stood) after an action
     useEffect(() => {
         if (gameState !== 'player-turn') return;
 
         const originalHandsJSON = JSON.stringify(playerHands);
         const newHands = JSON.parse(originalHandsJSON);
         let allHandsDone = true;
+        let nextActiveHand = -1;
 
-        newHands.forEach(hand => {
+        newHands.forEach((hand, index) => {
             if (hand.status === 'playing') {
-                if (hand.score > 21) {
-                    hand.status = 'bust';
-                } else if (hand.score === 21) {
-                    hand.status = 'stood';
-                }
+                if (hand.score > 21) hand.status = 'bust';
+                else if (hand.score === 21) hand.status = 'stood';
+                
                 if (hand.status === 'playing') {
                     allHandsDone = false;
+                    if(nextActiveHand === -1) nextActiveHand = index;
                 }
             }
         });
@@ -330,72 +333,96 @@ export default function App() {
 
         if (allHandsDone) {
             setGameState('dealer-turn');
+        } else if (newHands[activeHandIndex].status !== 'playing' && nextActiveHand !== -1) {
+            setActiveHandIndex(nextActiveHand);
         }
-    }, [playerHands, gameState]);
 
-    const playDealerTurn = useCallback(() => {
-        let currentDeck = [...deck];
-        let tempDealerHand = dealerHand.cards.map(c => ({ ...c, isHidden: false }));
-        
-        const drawLoop = (currentHand) => {
-            const scoreInfo = calculateScore(currentHand);
-            if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
-                const newCard = currentDeck.pop();
-                if(!newCard) { // End if deck is empty
+    }, [playerHands, gameState, activeHandIndex]);
+
+    // Dealer's Turn Logic
+    useEffect(() => {
+        if (gameState !== 'dealer-turn') return;
+
+        // Reveal dealer's hole card first
+        setDealerHand(prev => ({
+            ...prev,
+            cards: prev.cards.map(c => ({...c, isHidden: false}))
+        }));
+
+        const dealerDrawLoop = () => {
+            setDealerHand(currentDealerHand => {
+                const scoreInfo = calculateScore(currentDealerHand.cards);
+                
+                if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
+                    dealCard(card => {
+                        if (card) {
+                            // Use timeout to create a delay for the next draw
+                            setTimeout(() => {
+                                setDealerHand(prev => ({
+                                    ...prev,
+                                    cards: [...prev.cards, card],
+                                    ...calculateScore([...prev.cards, card])
+                                }));
+                                dealerDrawLoop(); // Continue the loop
+                            }, 1000);
+                        } else {
+                            // No more cards, end turn
+                            setGameState('end');
+                        }
+                    });
+                    return currentDealerHand; // Return current hand while waiting for async card
+                } else {
+                    // Dealer stands, end the turn
                     setGameState('end');
-                    return;
+                    return currentDealerHand;
                 }
-                const nextHand = [...currentHand, newCard];
-                setDealerHand({ cards: nextHand, ...calculateScore(nextHand) });
-                setTimeout(() => drawLoop(nextHand), 1000);
-            } else {
-                setDeck(currentDeck); // Update deck state once dealer is done
-                const finalDealerScore = scoreInfo.score;
-                let finalMessage = '';
-                playerHands.forEach((hand, index) => {
-                    finalMessage += `Hand ${index + 1}: `;
-                    if (hand.status === 'bust') {
-                        finalMessage += 'Busted. Dealer wins. ';
-                    } else if (finalDealerScore > 21 || hand.score > finalDealerScore) {
-                        finalMessage += 'You win! ';
-                    } else if (hand.score < finalDealerScore) {
-                        finalMessage += 'Dealer wins. ';
-                    } else {
-                        finalMessage += 'Push. ';
-                    }
-                });
-                setMessage(finalMessage);
-                setGameState('end');
-            }
+            });
         };
+        
+        // Start the drawing loop with a small delay after revealing the card
+        setTimeout(dealerDrawLoop, 1000);
 
-        setDealerHand(prev => ({ ...prev, cards: tempDealerHand }));
-        setTimeout(() => drawLoop(tempDealerHand), 1000);
-    }, [deck, calculateScore, playerHands, dealerHand.cards]);
-
+    }, [gameState, calculateScore, dealCard]);
+    
+    // Determine winner at the end of the round
     useEffect(() => {
-        if (gameState === 'dealer-turn') {
-            playDealerTurn();
+        if (gameState === 'end' && playerHands[0].cards.length > 0) {
+            const dealerScore = calculateScore(dealerHand.cards.filter(c => c)).score;
+            let finalMessage = '';
+            playerHands.forEach((hand, index) => {
+                finalMessage += `Hand ${index + 1}: `;
+                if (hand.status === 'bust') {
+                    finalMessage += 'Busted. Dealer wins. ';
+                } else if (dealerScore > 21 || hand.score > dealerScore) {
+                    finalMessage += 'You win! ';
+                } else if (hand.score < dealerScore) {
+                    finalMessage += 'Dealer wins. ';
+                } else {
+                    finalMessage += 'Push. ';
+                }
+            });
+            setMessage(finalMessage);
         }
-    }, [gameState, playDealerTurn]);
+    }, [gameState, playerHands, dealerHand, calculateScore]);
 
-    // Auto-deal after round ends
+    // Auto-deal timer logic
+    const dealCallback = useRef(dealNewGame);
+    useEffect(() => { dealCallback.current = dealNewGame; });
+
     useEffect(() => {
+        let timerId;
         if (gameState === 'end' && !endOfRoundMessageSet.current) {
             endOfRoundMessageSet.current = true;
             setMessage(prev => prev + "Next round in 5 seconds...");
-            const timerId = setTimeout(dealNewGame, 5000);
-            setAutoDealTimer(timerId);
-            return () => clearTimeout(timerId);
+            timerId = setTimeout(() => dealCallback.current(), 5000);
         }
-    }, [gameState, dealNewGame]);
+        return () => clearTimeout(timerId);
+    }, [gameState]);
 
     // Auto-clear feedback message
     useEffect(() => {
         if (feedback) {
-            const timer = setTimeout(() => {
-                setFeedback('');
-            }, 1500); // Clears feedback after 1.5 seconds
+            const timer = setTimeout(() => { setFeedback(''); }, 1500);
             return () => clearTimeout(timer);
         }
     }, [feedback]);
@@ -465,9 +492,9 @@ export default function App() {
                         <button 
                             onClick={dealNewGame} 
                             className="bg-blue-500 text-white font-semibold px-6 py-3 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400"
-                            disabled={autoDealTimer !== null}
+                            disabled={gameState === 'end'}
                         >
-                            {autoDealTimer !== null ? 'Dealing...' : 'Deal'}
+                            {gameState === 'end' ? 'Dealing...' : 'Deal'}
                         </button>
                     ) : <div className="w-28 h-12"></div>}
                 </header>
