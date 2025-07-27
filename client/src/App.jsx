@@ -296,6 +296,10 @@ export default function App() {
 
         const lowScore = scoreWithoutAces + aceCount;
         const highScore = lowScore + 10;
+        
+        if (highScore === 21 && hand.length === 2) {
+            return { score: 21, isSoft: false, display: 'Blackjack' };
+        }
 
         if (highScore > 21) {
             return { score: lowScore, isSoft: false, display: `${lowScore}` };
