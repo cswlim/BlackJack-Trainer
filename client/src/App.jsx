@@ -440,19 +440,22 @@ export default function App() {
 
     // Check player hand status (busts, 21, or all hands stood) after an action
     useEffect(() => {
-        if (gameState !== 'player-turn' || playerHands.some(h => h.cards.length < 2)) return;
+        if (gameState !== 'player-turn') return;
 
         const newHands = JSON.parse(JSON.stringify(playerHands));
         const activeHand = newHands[activeHandIndex];
 
-        // Check for bust or 21 on the active hand
-        if (activeHand.status === 'playing') {
-            if (activeHand.score > 21) activeHand.status = 'bust';
-            else if (activeHand.score === 21) activeHand.status = 'stood';
+        // Only check status if the hand has 2+ cards
+        if (activeHand && activeHand.cards.length >= 2) {
+            // Check for bust or 21 on the active hand
+            if (activeHand.status === 'playing') {
+                if (activeHand.score > 21) activeHand.status = 'bust';
+                else if (activeHand.score === 21) activeHand.status = 'stood';
+            }
         }
         
         // If the active hand just finished, decide what to do next
-        if (activeHand.status !== 'playing') {
+        if (activeHand && activeHand.status !== 'playing') {
             const nextHandIndex = newHands.findIndex((hand, index) => index > activeHandIndex && hand.status === 'playing');
             
             if (nextHandIndex !== -1) {
