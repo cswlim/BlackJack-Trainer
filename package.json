@@ -2,7 +2,10 @@
   "name": "blackjack-trainer",
   "version": "1.0.0",
   "scripts": {
-    "install": "cd client && npm install",
+    "postinstall": "cd client && npm install",
     "build": "cd client && npm run build"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
