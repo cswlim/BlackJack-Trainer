@@ -313,41 +313,35 @@ export default function App() {
         }
         setFeedback(feedbackMsg);
 
-        const newHands = JSON.parse(JSON.stringify(playerHands));
-
         switch(action) {
             case 'Hit':
             case 'Double':
                 dealCard(card => {
                     if(!card) return;
-                    const currentHand = newHands[activeHandIndex];
-                    currentHand.cards.push(card);
-                    Object.assign(currentHand, calculateScore(currentHand.cards));
-                    if(action === 'Double') currentHand.status = 'stood';
-                    setPlayerHands(newHands);
+                    setPlayerHands(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        const currentHand = newHands[activeHandIndex];
+                        currentHand.cards.push(card);
+                        Object.assign(currentHand, calculateScore(currentHand.cards));
+                        if(action === 'Double') currentHand.status = 'stood';
+                        return newHands;
+                    });
                 });
                 break;
             case 'Stand': {
-                const currentHand = newHands[activeHandIndex];
-                currentHand.status = 'stood';
-                setPlayerHands(newHands);
+                setPlayerHands(prevHands => {
+                    const newHands = JSON.parse(JSON.stringify(prevHands));
+                    const currentHand = newHands[activeHandIndex];
+                    currentHand.status = 'stood';
+                    return newHands;
+                });
                 break;
             }
             case 'Split': {
-                let cardsForSplit = [];
-                dealCard(card1 => {
-                    cardsForSplit.push(card1);
-                    dealCard(card2 => {
-                        cardsForSplit.push(card2);
-                        const handToSplit = newHands[activeHandIndex].cards;
-                        const hand1 = { cards: [handToSplit[0], cardsForSplit[0]], status: 'playing' };
-                        const hand2 = { cards: [handToSplit[1], cardsForSplit[1]], status: 'playing' };
-                        Object.assign(hand1, calculateScore(hand1.cards));
-                        Object.assign(hand2, calculateScore(hand2.cards));
-                        newHands.splice(activeHandIndex, 1, hand1, hand2);
-                        setPlayerHands(newHands);
-                    });
-                });
+                const handToSplit = playerHands[activeHandIndex].cards;
+                const hand1 = { cards: [handToSplit[0]], status: 'playing' };
+                const hand2 = { cards: [handToSplit[1]], status: 'playing' };
+                setPlayerHands([hand1, hand2]);
                 break;
             }
             default: break;
@@ -356,47 +350,66 @@ export default function App() {
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
-    // Check player hand status (busts, 21, or all hands stood) after an action
+    // Automatically deal a second card to a newly split hand
     useEffect(() => {
         if (gameState !== 'player-turn') return;
 
-        const originalHandsJSON = JSON.stringify(playerHands);
-        const newHands = JSON.parse(originalHandsJSON);
-        let allHandsDone = true;
-        let nextActiveHand = -1;
-        let playerBusted = false;
+        const activeHand = playerHands[activeHandIndex];
+        if (activeHand && activeHand.cards.length === 1) {
+            setTimeout(() => {
+                dealCard(card => {
+                    if (!card) return;
+                    setPlayerHands(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        const currentHand = newHands[activeHandIndex];
+                        currentHand.cards.push(card);
+                        Object.assign(currentHand, calculateScore(currentHand.cards));
+                        if (currentHand.score === 21) {
+                            currentHand.status = 'stood';
+                        }
+                        return newHands;
+                    });
+                });
+            }, 500); // Small delay to make the split visible
+        }
+    }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard]);
 
-        newHands.forEach((hand, index) => {
-            if (hand.status === 'playing') {
-                if (hand.score > 21) {
-                    hand.status = 'bust';
-                    playerBusted = true;
-                }
-                else if (hand.score === 21) hand.status = 'stood';
-                
-                if (hand.status === 'playing') {
-                    allHandsDone = false;
-                    if(nextActiveHand === -1) nextActiveHand = index;
-                }
-            }
-        });
 
-        if (JSON.stringify(newHands) !== originalHandsJSON) {
-            setPlayerHands(newHands);
+    // Check player hand status (busts, 21, or all hands stood) after an action
+    useEffect(() => {
+        if (gameState !== 'player-turn' || playerHands.some(h => h.cards.length < 2)) return;
+
+        const newHands = JSON.parse(JSON.stringify(playerHands));
+        const activeHand = newHands[activeHandIndex];
+
+        // Check for bust or 21 on the active hand
+        if (activeHand.status === 'playing') {
+            if (activeHand.score > 21) activeHand.status = 'bust';
+            else if (activeHand.score === 21) activeHand.status = 'stood';
         }
         
-        if (playerBusted && newHands.every(h => h.status === 'bust')) {
-            // Reveal dealer's card immediately upon player bust
-            setDealerHand(prev => ({
-                ...prev,
-                cards: prev.cards.map(c => ({...c, isHidden: false}))
-            }));
-            // End the game after a short delay to show the cards
-            setTimeout(() => setGameState('end'), 500);
-        } else if (allHandsDone) {
-            setGameState('dealer-turn');
-        } else if (newHands[activeHandIndex].status !== 'playing' && nextActiveHand !== -1) {
-            setActiveHandIndex(nextActiveHand);
+        // If the active hand just finished, decide what to do next
+        if (activeHand.status !== 'playing') {
+            const nextHandIndex = newHands.findIndex((hand, index) => index > activeHandIndex && hand.status === 'playing');
+            
+            if (nextHandIndex !== -1) {
+                // There's another split hand to play
+                setActiveHandIndex(nextHandIndex);
+            } else {
+                // All player hands are finished, check if all busted
+                const allBusted = newHands.every(h => h.status === 'bust');
+                if (allBusted) {
+                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
+                    setTimeout(() => setGameState('end'), 500);
+                } else {
+                    setGameState('dealer-turn');
+                }
+            }
+        }
+        
+        // Update state if it has changed
+        if (JSON.stringify(newHands) !== JSON.stringify(playerHands)) {
+            setPlayerHands(newHands);
         }
 
     }, [playerHands, gameState, activeHandIndex]);
@@ -452,6 +465,7 @@ export default function App() {
             const dealerScore = calculateScore(dealerHand.cards.filter(c => c)).score;
             let resultMessage = '';
             playerHands.forEach((hand, index) => {
+                resultMessage += `Hand ${index + 1}: `;
                 if (hand.status === 'bust') {
                     resultMessage += 'You lose (Busted). ';
                 } else if (dealerScore > 21) {
