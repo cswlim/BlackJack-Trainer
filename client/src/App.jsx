@@ -150,6 +150,29 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
+const HistoryTracker = ({ history, correctCount, incorrectCount }) => {
+    const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
+    
+    return (
+        <div className="fixed top-4 right-4 w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20">
+            <h3 className="text-lg font-bold border-b border-gray-600 pb-2 mb-2 flex justify-between">
+                <span>History</span>
+                <span className="flex items-center gap-3">
+                    <span className="text-green-400">✅ {correctCount}</span>
+                    <span className="text-red-400">❌ {incorrectCount}</span>
+                </span>
+            </h3>
+            <ul className="space-y-2">
+                {history.slice(0, 5).map((item, index) => (
+                    <li key={index} className={`text-sm transition-opacity duration-300 ${opacities[index] || 'opacity-0'}`}>
+                        <span className={item.correct ? 'text-green-400' : 'text-red-400'}>{item.correct ? '✅' : '❌'}</span> {item.text}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
 
 // --- MAIN APP COMPONENT ---
 
@@ -178,6 +201,9 @@ export default function App() {
     // UI state
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
+    const [history, setHistory] = useState([]);
+    const [correctCount, setCorrectCount] = useState(0);
+    const [incorrectCount, setIncorrectCount] = useState(0);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
@@ -250,6 +276,9 @@ export default function App() {
 
         if (deck.length < 52 || isCutCardRevealed) {
             createShoe();
+            setHistory([]);
+            setCorrectCount(0);
+            setIncorrectCount(0);
             setTimeout(() => setGameState('pre-deal'), 100);
             return;
         }
@@ -303,15 +332,19 @@ export default function App() {
         const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
-        let feedbackMsg = `Your move: ${action}. Basic strategy: ${correctMove}. `;
-        if (action.charAt(0) === correctMove) {
-            feedbackMsg += "✅ Correct!";
+        const isCorrect = action.charAt(0) === correctMove;
+        const feedbackText = `Your move: ${action}. Strategy: ${correctMove}.`;
+        const historyItem = { text: feedbackText, correct: isCorrect };
+
+        setHistory(prevHistory => [historyItem, ...prevHistory]);
+        if (isCorrect) {
+            setCorrectCount(prev => prev + 1);
             lastActionFeedback.current = "Correct!";
         } else {
-            feedbackMsg += "❌ Incorrect.";
+            setIncorrectCount(prev => prev + 1);
             lastActionFeedback.current = "Incorrect.";
         }
-        setFeedback(feedbackMsg);
+        setFeedback(`${feedbackText} ${isCorrect ? '✅' : '❌'}`);
 
         switch(action) {
             case 'Hit':
@@ -509,6 +542,9 @@ export default function App() {
     const selectMode = (mode) => {
         setGameMode(mode);
         createShoe();
+        setHistory([]);
+        setCorrectCount(0);
+        setIncorrectCount(0);
         if (mode === 'solo') {
             setGameState('pre-deal');
             setMessage('Solo Mode: Press Deal to start.');
@@ -557,6 +593,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 font-sans p-4 flex flex-col items-center">
+            {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} />}
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <div className="w-full max-w-7xl mx-auto">
                 {/* Header */}
