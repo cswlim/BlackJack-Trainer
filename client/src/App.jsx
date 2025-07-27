@@ -132,6 +132,7 @@ export default function App() {
     // UI state
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
+    const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
     // --- DECK & SHOE LOGIC ---
@@ -180,7 +181,7 @@ export default function App() {
             score -= 10;
             aceCount--;
         }
-        return { score, isSoft: aceCount > 0 && score + 10 <= 21 };
+        return { score, isSoft: aceCount > 0 && score - 10 <= 21 };
     }, []);
 
     // --- ATOMIC CARD DEALING ---
@@ -199,6 +200,7 @@ export default function App() {
 
     const dealNewGame = useCallback(() => {
         endOfRoundMessageSet.current = false;
+        lastActionFeedback.current = '';
 
         if (deck.length < 52 || isCutCardRevealed) {
             createShoe();
@@ -258,8 +260,10 @@ export default function App() {
         let feedbackMsg = `Your move: ${action}. Basic strategy: ${correctMove}. `;
         if (action.charAt(0) === correctMove) {
             feedbackMsg += "✅ Correct!";
+            lastActionFeedback.current = "Correct!";
         } else {
             feedbackMsg += "❌ Incorrect.";
+            lastActionFeedback.current = "Incorrect.";
         }
         setFeedback(feedbackMsg);
 
@@ -314,10 +318,14 @@ export default function App() {
         const newHands = JSON.parse(originalHandsJSON);
         let allHandsDone = true;
         let nextActiveHand = -1;
+        let playerBusted = false;
 
         newHands.forEach((hand, index) => {
             if (hand.status === 'playing') {
-                if (hand.score > 21) hand.status = 'bust';
+                if (hand.score > 21) {
+                    hand.status = 'bust';
+                    playerBusted = true;
+                }
                 else if (hand.score === 21) hand.status = 'stood';
                 
                 if (hand.status === 'playing') {
@@ -330,8 +338,16 @@ export default function App() {
         if (JSON.stringify(newHands) !== originalHandsJSON) {
             setPlayerHands(newHands);
         }
-
-        if (allHandsDone) {
+        
+        if (playerBusted && newHands.every(h => h.status === 'bust')) {
+            // Reveal dealer's card immediately upon player bust
+            setDealerHand(prev => ({
+                ...prev,
+                cards: prev.cards.map(c => ({...c, isHidden: false}))
+            }));
+            // End the game after a short delay to show the cards
+            setTimeout(() => setGameState('end'), 500);
+        } else if (allHandsDone) {
             setGameState('dealer-turn');
         } else if (newHands[activeHandIndex].status !== 'playing' && nextActiveHand !== -1) {
             setActiveHandIndex(nextActiveHand);
@@ -388,19 +404,21 @@ export default function App() {
     useEffect(() => {
         if (gameState === 'end' && playerHands[0].cards.length > 0) {
             const dealerScore = calculateScore(dealerHand.cards.filter(c => c)).score;
-            let finalMessage = '';
+            let resultMessage = '';
             playerHands.forEach((hand, index) => {
-                finalMessage += `Hand ${index + 1}: `;
                 if (hand.status === 'bust') {
-                    finalMessage += 'Busted. Dealer wins. ';
-                } else if (dealerScore > 21 || hand.score > dealerScore) {
-                    finalMessage += 'You win! ';
+                    resultMessage += 'You lose (Busted). ';
+                } else if (dealerScore > 21) {
+                    resultMessage += 'You win (Dealer Busted). ';
+                } else if (hand.score > dealerScore) {
+                    resultMessage += 'You win (Higher Score). ';
                 } else if (hand.score < dealerScore) {
-                    finalMessage += 'Dealer wins. ';
+                    resultMessage += 'You lose (Lower Score). ';
                 } else {
-                    finalMessage += 'Push. ';
+                    resultMessage += 'Push. ';
                 }
             });
+            const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
             setMessage(finalMessage);
         }
     }, [gameState, playerHands, dealerHand, calculateScore]);
@@ -413,8 +431,7 @@ export default function App() {
         let timerId;
         if (gameState === 'end' && !endOfRoundMessageSet.current) {
             endOfRoundMessageSet.current = true;
-            setMessage(prev => prev + "Next round in 5 seconds...");
-            timerId = setTimeout(() => dealCallback.current(), 5000);
+            timerId = setTimeout(() => dealCallback.current(), 3500);
         }
         return () => clearTimeout(timerId);
     }, [gameState]);
