@@ -150,16 +150,18 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
-const HistoryTracker = ({ history, correctCount, incorrectCount }) => {
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount }) => {
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
         <div className="fixed top-4 right-4 w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20">
             <h3 className="text-lg font-bold border-b border-gray-600 pb-2 mb-2 flex justify-between">
                 <span>History</span>
-                <span className="flex items-center gap-3">
-                    <span className="text-green-400">✅ {correctCount}</span>
-                    <span className="text-red-400">❌ {incorrectCount}</span>
+                <span className="flex items-center gap-2 text-base">
+                    <span className="text-blue-400">W:{winCount}</span>
+                    <span className="text-orange-400">L:{lossCount}</span>
+                    <span className="text-green-400">✅{correctCount}</span>
+                    <span className="text-red-400">❌{incorrectCount}</span>
                 </span>
             </h3>
             <ul className="space-y-2">
@@ -204,6 +206,8 @@ export default function App() {
     const [history, setHistory] = useState([]);
     const [correctCount, setCorrectCount] = useState(0);
     const [incorrectCount, setIncorrectCount] = useState(0);
+    const [winCount, setWinCount] = useState(0);
+    const [lossCount, setLossCount] = useState(0);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
@@ -279,6 +283,8 @@ export default function App() {
             setHistory([]);
             setCorrectCount(0);
             setIncorrectCount(0);
+            setWinCount(0);
+            setLossCount(0);
             setTimeout(() => setGameState('pre-deal'), 100);
             return;
         }
@@ -497,20 +503,34 @@ export default function App() {
         if (gameState === 'end' && playerHands[0].cards.length > 0) {
             const dealerScore = calculateScore(dealerHand.cards.filter(c => c)).score;
             let resultMessage = '';
+            let handWins = 0;
+            let handLosses = 0;
+
             playerHands.forEach((hand, index) => {
                 resultMessage += `Hand ${index + 1}: `;
                 if (hand.status === 'bust') {
                     resultMessage += 'You lose (Busted). ';
+                    handLosses++;
                 } else if (dealerScore > 21) {
                     resultMessage += 'You win (Dealer Busted). ';
+                    handWins++;
                 } else if (hand.score > dealerScore) {
                     resultMessage += 'You win (Higher Score). ';
+                    handWins++;
                 } else if (hand.score < dealerScore) {
                     resultMessage += 'You lose (Lower Score). ';
+                    handLosses++;
                 } else {
                     resultMessage += 'Push. ';
                 }
             });
+
+            if (handWins > handLosses) {
+                setWinCount(prev => prev + 1);
+            } else if (handLosses > handWins) {
+                setLossCount(prev => prev + 1);
+            }
+
             const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
             setMessage(finalMessage);
         }
@@ -545,6 +565,8 @@ export default function App() {
         setHistory([]);
         setCorrectCount(0);
         setIncorrectCount(0);
+        setWinCount(0);
+        setLossCount(0);
         if (mode === 'solo') {
             setGameState('pre-deal');
             setMessage('Solo Mode: Press Deal to start.');
@@ -593,7 +615,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 font-sans p-4 flex flex-col items-center">
-            {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} />}
+            {gameMode === 'solo' && <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} />}
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <div className="w-full max-w-7xl mx-auto">
                 {/* Header */}
