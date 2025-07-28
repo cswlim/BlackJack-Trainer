@@ -815,9 +815,6 @@ export default function App() {
                     <header className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-6">
                             <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
-                            <div className="flex items-center gap-4">
-                               <Toggle isEnabled={autoDeal} onToggle={() => setAutoDeal(!autoDeal)} labelOn="Auto" labelOff="Manual"/>
-                            </div>
                         </div>
                     </header>
 
@@ -837,9 +834,8 @@ export default function App() {
                                 <button 
                                     onClick={dealNewGame} 
                                     className="bg-blue-500 text-white font-semibold px-8 py-4 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400 text-xl"
-                                    disabled={gameState === 'end' && autoDeal}
                                 >
-                                    {gameState === 'end' && autoDeal ? 'Dealing...' : 'Deal'}
+                                    Deal
                                 </button>
                             }
                             {(feedback || message) && gameState !== 'pre-deal' && gameState !== 'end' &&
