@@ -854,7 +854,17 @@ export default function App() {
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
                                             <div className="font-bold text-xl mb-1 text-center h-14">
-                                                <p>{playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}{hand.display}</p>
+                                                <div className="flex justify-center items-center gap-2">
+                                                    <span>
+                                                        {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
+                                                        {hand.display}
+                                                    </span>
+                                                    {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
+                                                        <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
+                                                            SPLIT
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {hand.status !== 'playing' && (
                                                     <p className="text-base text-gray-400 capitalize">{hand.status}</p>
                                                 )}
