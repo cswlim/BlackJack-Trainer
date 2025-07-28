@@ -159,7 +159,7 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
-const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount, cardsDealt }) => {
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount }) => {
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
@@ -179,9 +179,6 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
                     <div className="flex gap-3">
                         <span className="text-yellow-400">P-BJ: {playerBjCount}</span>
                         <span className="text-purple-400">D-BJ: {dealerBjCount}</span>
-                    </div>
-                     <div className="flex gap-3">
-                        <span className="text-white">Cards: {cardsDealt}</span>
                     </div>
                 </div>
             </div>
@@ -240,7 +237,7 @@ export default function App() {
     const [pushCount, setPushCount] = useState(0);
     const [playerBjCount, setPlayerBjCount] = useState(0);
     const [dealerBjCount, setDealerBjCount] = useState(0);
-    const [cardsDealt, setCardsDealt] = useState(0);
+    const [isActionDisabled, setIsActionDisabled] = useState(false);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
@@ -271,7 +268,6 @@ export default function App() {
         setRunningCount(0);
         setIsCutCardRevealed(false);
         setShowCutCardOnTable(false);
-        setCardsDealt(0);
     }, []);
 
     // --- HAND SCORE CALCULATION ---
@@ -325,7 +321,6 @@ export default function App() {
             }
             const card = newDeck.pop();
             setRunningCount(prev => prev + getCardCountValue(card));
-            setCardsDealt(prev => prev + 1);
             callback(card);
             return newDeck;
         });
@@ -407,6 +402,7 @@ export default function App() {
     
     // Player Actions
     const executePlayerAction = useCallback((actionCode, actionName) => {
+        setIsActionDisabled(true);
         const hands = gameMode === 'solo' ? playerHands : tableHands;
         const handIndex = gameMode === 'solo' ? activeHandIndex : playerSeat;
         const handsUpdater = gameMode === 'solo' ? setPlayerHands : setTableHands;
@@ -535,7 +531,10 @@ export default function App() {
 
     // Check player hand status (busts, 21, or all hands stood) after an action
     useEffect(() => {
-        if (gameState !== 'player-turn') return;
+        if (gameState !== 'player-turn') {
+            setIsActionDisabled(false);
+            return;
+        }
 
         const hands = gameMode === 'solo' ? playerHands : tableHands;
         const handsUpdater = gameMode === 'solo' ? setPlayerHands : setTableHands;
@@ -574,6 +573,8 @@ export default function App() {
         if (JSON.stringify(newHands) !== JSON.stringify(hands)) {
             handsUpdater(newHands);
         }
+
+        setTimeout(() => setIsActionDisabled(false), 500);
 
     }, [playerHands, tableHands, gameState, activeHandIndex, playerSeat, gameMode]);
 
@@ -854,7 +855,7 @@ export default function App() {
                         {/* Player Area */}
                         {gameMode === 'solo' ? (
                             <div className="text-center">
-                                <div className="flex justify-center items-start space-x-4">
+                                <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
                                             <h3 className="font-bold">{hand.display} {hand.status !== 'playing' && `(${hand.status})`}</h3>
@@ -884,21 +885,20 @@ export default function App() {
                     
                     {/* Action Buttons */}
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode, shortcuts]) => (
+                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
                              <button
                                  key={actionName}
                                  onClick={() => {
                                      handlePlayerAction(actionCode, actionName);
                                  }}
-                                 disabled={gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                 className={`px-4 py-2 md:px-6 md:py-3 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center leading-tight
+                                 disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
+                                 className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
                                      ${actionCode === 'H' && 'bg-green-500 text-white'}
                                      ${actionCode === 'S' && 'bg-red-500 text-white'}
                                      ${actionCode === 'D' && 'bg-orange-400 text-white'}
                                      ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
                              >
-                                 <span>{actionName}</span>
-                                 <span className="text-xs font-mono opacity-75 mt-1">{shortcuts}</span>
+                                 {actionName}
                              </button>
                          ))}
                     </div>
