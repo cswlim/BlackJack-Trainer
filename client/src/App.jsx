@@ -1210,7 +1210,7 @@ export default function App() {
                     </div>
                 </div>
                 {/* Responsive order for History and Streak */}
-                <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col md:flex-col-reverse flex-shrink-0">
+                <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0"> {/* Changed back to flex-col-reverse for mobile, flex-col for desktop */}
                     <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
                     <StreakCounter streak={streakCount} />
                 </div>
