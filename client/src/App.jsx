@@ -357,79 +357,59 @@ export default function App() {
         });
     }, [cutCardPosition]);
 
-    const dealNewGame = useCallback(() => {
-        endOfRoundMessageSet.current = false;
-        lastActionFeedback.current = '';
+  const dealNewGame = useCallback(() => {
+        // This function is called when the user clicks "Deal".
+        // It should either deal a new hand from the current shoe,
+        // or create a new shoe and then deal the first hand from it.
 
-        if (isCutCardRevealed || (gameMode === 'solo' && gameState !== 'pre-game')) {
-            createShoe();
-            setTimeout(() => setGameState('pre-deal'), 100);
-            return;
-        }
-
-        setMessage('');
-        setFeedback('');
-        setActiveHandIndex(0);
-        
-        if (gameMode === 'solo') {
-            let cardsToDeal = [];
-            let dealtCount = 0;
-            const dealInitialSolo = () => {
-                if(dealtCount < 4) {
-                    dealCard(card => {
-                        cardsToDeal.push(card);
-                        dealtCount++;
-                        dealInitialSolo();
-                    });
-                } else {
-                    const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
-                    const tempPlayerHand = [playerCard1, playerCard2];
-                    const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
-                    const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-                    setPlayerHands([playerInitialState]);
-                    setDealerHand({ cards: tempDealerHand });
-                    const playerHasBj = playerInitialState.score === 21;
-                    const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
-                    if (playerHasBj || dealerHasBj) {
-                        setGameState('end');
-                    } else {
-                        setGameState('player-turn');
-                    }
-                }
-            };
-            dealInitialSolo();
-        } else { // Counting Mode
-            let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
-            let tempDealerHand = [];
-            let cardsToDealCount = 15; // 7 players * 2 cards + 1 dealer card
-            
-            const dealCountingTable = () => {
-                if (cardsToDealCount > 0) {
-                    dealCard(card => {
-                        if (cardsToDealCount > 8) { // First card for each player
-                            tempTableHands[8 - (cardsToDealCount % 8)].cards.push(card);
-                        } else if (cardsToDealCount === 8) { // Dealer's up card
-                            tempDealerHand.push(card);
-                        } else { // Second card for each player
-                            tempTableHands[7 - cardsToDealCount].cards.push(card);
-                        }
-                        cardsToDealCount--;
-                        dealCountingTable();
-                    });
-                } else {
-                    dealCard(card => { // Dealer's hole card
-                        tempDealerHand.push({ ...card, isHidden: true });
-                        setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
-                        setDealerHand({ cards: tempDealerHand });
-                        setActiveTableHandIndex(0);
-                        setGameState('ai-turn');
-                    });
-                }
-            };
-            dealCountingTable();
-        }
-
-    }, [isCutCardRevealed, createShoe, calculateScore, dealCard, gameMode]);
+        const performDeal = () => {
+            endOfRoundMessageSet.current = false;
+            lastActionFeedback.current = '';
+            setMessage('');
+            setFeedback('');
+            setActiveHandIndex(0);
+            
+            if (gameMode === 'solo') {
+                let cardsToDeal = [];
+                let dealtCount = 0;
+                const dealInitialSolo = () => {
+                    if(dealtCount < 4) {
+                        dealCard(card => {
+                            cardsToDeal.push(card);
+                            dealtCount++;
+                            dealInitialSolo();
+                        });
+                    } else {
+                        const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
+                        const tempPlayerHand = [playerCard1, playerCard2];
+                        const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+                        const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
+                        setPlayerHands([playerInitialState]);
+                        setDealerHand({ cards: tempDealerHand });
+                        const playerHasBj = playerInitialState.score === 21;
+                        const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
+                        if (playerHasBj || dealerHasBj) {
+                            setGameState('end');
+                        } else {
+                            setGameState('player-turn');
+                        }
+                    }
+                };
+                dealInitialSolo();
+            } else { // Counting Mode
+                let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
+                let tempDealerHand = [];
+                let cardsToDealCount = 15; // 7 players * 2 cards + 1 dealer card
+                
+                const dealCountingTable = () => {
+                    if (cardsToDealCount > 0) {
+                        dealCard(card => {
+                            if (cardsToDealCount > 8) { // First card for each player
+                                tempTableHands[8 - (cardsToDealCount % 8)].cards.push(card);
+                            } else if (cardsToDealCount === 8) { // Dealer's up card
+                                tempDealerHand.push(card);
+                            } else { // Second card for each player
+                                tempTableHands[7 -
     
     // Player Actions
     const executePlayerAction = useCallback((actionCode, actionName) => {
