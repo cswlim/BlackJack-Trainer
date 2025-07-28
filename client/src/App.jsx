@@ -159,11 +159,11 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
-const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount, cardsDealt }) => {
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount }) => {
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
-        <div className="w-full md:w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 mt-4 md:mt-0 md:fixed md:top-4 md:right-4 group">
+        <div className="w-full md:w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 group">
             <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
                 <h3 className="text-lg font-bold">History</h3>
                 <div className="flex flex-col items-end text-sm space-y-1">
@@ -198,6 +198,18 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
         </div>
     );
 };
+
+const StreakCounter = ({ streak }) => {
+    if (streak < 2) return null;
+
+    return (
+        <div className="bg-orange-500 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2">
+            <span className="text-2xl">🔥</span>
+            <span className="text-xl font-bold">{streak} Streak!</span>
+        </div>
+    );
+};
+
 
 // --- MAIN APP COMPONENT ---
 
@@ -237,7 +249,7 @@ export default function App() {
     const [pushCount, setPushCount] = useState(0);
     const [playerBjCount, setPlayerBjCount] = useState(0);
     const [dealerBjCount, setDealerBjCount] = useState(0);
-    const [cardsDealt, setCardsDealt] = useState(0);
+    const [streakCount, setStreakCount] = useState(0);
     const [isActionDisabled, setIsActionDisabled] = useState(false);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
@@ -269,7 +281,6 @@ export default function App() {
         setRunningCount(0);
         setIsCutCardRevealed(false);
         setShowCutCardOnTable(false);
-        setCardsDealt(0);
     }, []);
 
     // --- HAND SCORE CALCULATION ---
@@ -323,7 +334,6 @@ export default function App() {
             }
             const card = newDeck.pop();
             setRunningCount(prev => prev + getCardCountValue(card));
-            setCardsDealt(prev => prev + 1);
             callback(card);
             return newDeck;
         });
@@ -422,9 +432,11 @@ export default function App() {
         setHistory(prevHistory => [historyItem, ...prevHistory]);
         if (isCorrect) {
             setCorrectCount(prev => prev + 1);
+            setStreakCount(prev => prev + 1);
             lastActionFeedback.current = "Correct!";
         } else {
             setIncorrectCount(prev => prev + 1);
+            setStreakCount(0);
             lastActionFeedback.current = "Incorrect.";
         }
         setFeedback(`${feedbackText} ${isCorrect ? '✅' : '❌'}`);
@@ -778,6 +790,7 @@ export default function App() {
         setPushCount(0);
         setPlayerBjCount(0);
         setDealerBjCount(0);
+        setStreakCount(0);
         if (mode === 'solo') {
             setGameState('pre-deal');
             setMessage('Solo Mode: Press Deal to start.');
@@ -906,7 +919,7 @@ export default function App() {
                          ))}
                     </div>
                 </div>
-                {gameMode === 'solo' && <div className="w-full md:w-64"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} /></div>}
+                {gameMode === 'solo' && <div className="w-full md:w-64"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} /><StreakCounter streak={streakCount} /></div>}
             </div>
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <style>{`
