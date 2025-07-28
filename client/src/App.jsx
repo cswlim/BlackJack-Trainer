@@ -670,7 +670,7 @@ export default function App() {
         
         // Update feedback message
         if (isCorrect) {
-            setFeedback('✅'); // Use the heavy check mark emoji
+            setFeedback('✔️'); // Use the heavy check mark emoji
             setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
@@ -1209,7 +1209,8 @@ export default function App() {
                             ))}
                     </div>
                 </div>
-                <div className="w-full md:w-72 mt-4 md:mt-0 flex-shrink-0">
+                {/* Responsive order for History and Streak */}
+                <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col md:flex-col-reverse flex-shrink-0">
                     <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
                     <StreakCounter streak={streakCount} />
                 </div>
