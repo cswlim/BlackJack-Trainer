@@ -884,7 +884,7 @@ export default function App() {
                     
                     {/* Action Buttons */}
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H', 'A/J'], ['Stand', 'S', 'S/K'], ['Double', 'D', 'D/L'], ['Split', 'P', 'F/;']].map(([actionName, actionCode, shortcuts]) => (
+                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode, shortcuts]) => (
                              <button
                                  key={actionName}
                                  onClick={() => {
