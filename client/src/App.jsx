@@ -184,7 +184,7 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
             </div>
             <ul className="space-y-2 max-h-28 overflow-hidden transition-all duration-300 group-hover:max-h-96 group-hover:overflow-y-auto">
                 {history.slice(0, 25).map((item, index) => (
-                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-25'}`}>
+                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-0'}`}>
                         {item.isResult ? (
                             <span className="font-bold text-yellow-300">{item.text}</span>
                         ) : (
