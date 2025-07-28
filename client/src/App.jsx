@@ -853,10 +853,12 @@ export default function App() {
                                 <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <h3 className="font-bold text-xl mb-1">
-                                                {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
-                                                {hand.display} {hand.status !== 'playing' && hand.status}
-                                            </h3>
+                                            <div className="font-bold text-xl mb-1 text-center h-14">
+                                                <p>{playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}{hand.display}</p>
+                                                {hand.status !== 'playing' && (
+                                                    <p className="text-base text-gray-400 capitalize">{hand.status}</p>
+                                                )}
+                                            </div>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
