@@ -427,7 +427,7 @@ export default function App() {
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
         const isCorrect = actionCode === correctMove;
-        const handInfo = `Hand (${currentHandRef.display}): `;
+        const handInfo = `Hand ${currentHandRef.display}: `;
         const feedbackText = `${handInfo}Your move: ${actionName}. Strategy: ${correctMove}.`;
         const historyItem = { text: feedbackText, correct: isCorrect };
 
@@ -826,7 +826,7 @@ export default function App() {
 
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
                         <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `(${dealerHand.display})` : ''}</h2>
+                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
                             <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
@@ -854,8 +854,8 @@ export default function App() {
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
                                             <h3 className="font-bold text-xl mb-1">
-                                                {playerHands.length > 1 ? `Hand ${i + 1} ` : ''}
-                                                ({hand.display}) {hand.status !== 'playing' && `(${hand.status})`}
+                                                {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
+                                                {hand.display} {hand.status !== 'playing' && hand.status}
                                             </h3>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
