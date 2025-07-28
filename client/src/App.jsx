@@ -184,7 +184,7 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
             </div>
             <ul className="space-y-2 max-h-28 overflow-hidden transition-all duration-300 group-hover:max-h-96 group-hover:overflow-y-auto">
                 {history.slice(0, 25).map((item, index) => (
-                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-0'}`}>
+                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-25'}`}>
                         {item.isResult ? (
                             <span className="font-bold text-yellow-300">{item.text}</span>
                         ) : (
@@ -199,34 +199,24 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
     );
 };
 
-const Toggle = ({ isEnabled, onToggle, labelOn, labelOff }) => (
-    <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-400">{isEnabled ? labelOn : labelOff}</span>
-        <button onClick={onToggle} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ${isEnabled ? 'bg-blue-500' : 'bg-gray-600'}`}>
-            <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ${isEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-    </div>
-);
-
-
 // --- MAIN APP COMPONENT ---
 
 export default function App() {
     // Game settings
     const [gameMode, setGameMode] = useState(null); // 'solo', 'counting'
-    const [autoDeal, setAutoDeal] = useState(true);
     const NUM_DECKS = 6;
 
     // Game state
     const [deck, setDeck] = useState([]);
     const [cutCardPosition, setCutCardPosition] = useState(0);
     const [isCutCardRevealed, setIsCutCardRevealed] = useState(false);
+    const [showCutCardOnTable, setShowCutCardOnTable] = useState(false);
     const [gameState, setGameState] = useState('pre-game'); // 'pre-game', 'pre-deal', 'player-turn', 'dealer-turn', 'end'
     
     // Player & Dealer state
-    const [playerHands, setPlayerHands] = useState([ { cards: [], score: 0, isSoft: false, display: '0' } ]);
+    const [playerHands, setPlayerHands] = useState([]);
     const [activeHandIndex, setActiveHandIndex] = useState(0);
-    const [dealerHand, setDealerHand] = useState({ cards: [], score: 0, isSoft: false, display: '0' });
+    const [dealerHand, setDealerHand] = useState({ cards: [] });
     
     // Counting mode state
     const [tableHands, setTableHands] = useState(Array.from({ length: 7 }, () => ({ cards: [], score: 0, display: '0', status: 'playing' })));
@@ -276,6 +266,7 @@ export default function App() {
         setDeck(newDeck);
         setRunningCount(0);
         setIsCutCardRevealed(false);
+        setShowCutCardOnTable(false);
     }, []);
 
     // --- HAND SCORE CALCULATION ---
@@ -323,27 +314,23 @@ export default function App() {
                 return [];
             }
             const newDeck = [...prevDeck];
+            if (newDeck.length === cutCardPosition) {
+                setIsCutCardRevealed(true);
+                setShowCutCardOnTable(true);
+            }
             const card = newDeck.pop();
             setRunningCount(prev => prev + getCardCountValue(card));
             callback(card);
             return newDeck;
         });
-    }, []);
+    }, [cutCardPosition]);
 
     const dealNewGame = useCallback(() => {
         endOfRoundMessageSet.current = false;
         lastActionFeedback.current = '';
 
-        if (deck.length < 52 || isCutCardRevealed) {
+        if (isCutCardRevealed) {
             createShoe();
-            setHistory([]);
-            setCorrectCount(0);
-            setIncorrectCount(0);
-            setWinCount(0);
-            setLossCount(0);
-            setPushCount(0);
-            setPlayerBjCount(0);
-            setDealerBjCount(0);
             setTimeout(() => setGameState('pre-deal'), 100);
             return;
         }
@@ -410,7 +397,7 @@ export default function App() {
             dealCountingTable();
         }
 
-    }, [deck.length, isCutCardRevealed, createShoe, calculateScore, dealCard, gameMode]);
+    }, [isCutCardRevealed, createShoe, calculateScore, dealCard, gameMode]);
     
     // Player Actions
     const executePlayerAction = useCallback((actionCode, actionName) => {
@@ -476,9 +463,12 @@ export default function App() {
                         });
                     });
                 } else {
-                    const hand1 = { cards: [handToSplit[0]], status: 'playing' };
-                    const hand2 = { cards: [handToSplit[1]], status: 'playing' };
-                    setPlayerHands([hand1, hand2]);
+                    const newHands = JSON.parse(JSON.stringify(playerHands));
+                    newHands.splice(activeHandIndex, 1, 
+                        { cards: [handToSplit[0]], status: 'playing' },
+                        { cards: [handToSplit[1]], status: 'playing' }
+                    );
+                    setPlayerHands(newHands);
                 }
                 break;
             }
@@ -734,20 +724,6 @@ export default function App() {
             setHistory(prev => [{ text: resultMessage, isResult: true }, ...prev]);
         }
     }, [gameState, playerHands, tableHands, dealerHand.cards, calculateScore, gameMode, playerSeat]);
-
-    // Auto-deal timer logic
-    const dealCallback = useRef(dealNewGame);
-    useEffect(() => { dealCallback.current = dealNewGame; });
-
-    useEffect(() => {
-        let timerId;
-        if (gameState === 'end' && autoDeal) {
-            timerId = setTimeout(() => dealCallback.current(), 1500);
-        }
-        return () => {
-            if (timerId) clearTimeout(timerId);
-        };
-    }, [gameState, autoDeal]);
 
     // Auto-clear feedback message
     useEffect(() => {
