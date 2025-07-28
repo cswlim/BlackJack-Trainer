@@ -228,10 +228,12 @@ export default function App() {
     const [dealerHand, setDealerHand] = useState({ cards: [], score: 0, isSoft: false, display: '0' });
     
     // Counting mode state
-    const [tableHands, setTableHands] = useState([]);
+    const [tableHands, setTableHands] = useState(Array.from({ length: 7 }, () => ({ cards: [], score: 0, display: '0', status: 'playing' })));
     const [playerSeat, setPlayerSeat] = useState(null);
     const [runningCount, setRunningCount] = useState(0);
     const [showCountPrompt, setShowCountPrompt] = useState(false);
+    const [activeTableHandIndex, setActiveTableHandIndex] = useState(0);
+    const [pendingPlayerAction, setPendingPlayerAction] = useState(null);
 
     // UI state
     const [message, setMessage] = useState('Select a game mode to start.');
@@ -320,6 +322,7 @@ export default function App() {
             }
             const newDeck = [...prevDeck];
             const card = newDeck.pop();
+            setRunningCount(prev => prev + getCardCountValue(card));
             callback(card);
             return newDeck;
         });
@@ -342,51 +345,77 @@ export default function App() {
             return;
         }
 
-        let cardsToDeal = [];
-        let dealtCount = 0;
+        setMessage('');
+        setFeedback('');
+        setActiveHandIndex(0);
         
-        const dealInitialCards = () => {
-            if(dealtCount < 4) {
-                dealCard(card => {
-                    cardsToDeal.push(card);
-                    dealtCount++;
-                    dealInitialCards();
-                });
-            } else {
-                // All 4 cards have been dealt, now set the state
-                const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
-
-                setMessage('');
-                setFeedback('');
-                setActiveHandIndex(0);
-
-                const tempPlayerHand = [playerCard1, playerCard2];
-                const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
-
-                const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-                setPlayerHands([playerInitialState]);
-                setDealerHand({ cards: tempDealerHand });
-                
-                const playerHasBj = playerInitialState.score === 21;
-                const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
-
-                if (playerHasBj || dealerHasBj) {
-                    setGameState('end');
+        if (gameMode === 'solo') {
+            let cardsToDeal = [];
+            let dealtCount = 0;
+            const dealInitialSolo = () => {
+                if(dealtCount < 4) {
+                    dealCard(card => {
+                        cardsToDeal.push(card);
+                        dealtCount++;
+                        dealInitialSolo();
+                    });
                 } else {
-                    setGameState('player-turn');
+                    const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
+                    const tempPlayerHand = [playerCard1, playerCard2];
+                    const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+                    const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
+                    setPlayerHands([playerInitialState]);
+                    setDealerHand({ cards: tempDealerHand });
+                    const playerHasBj = playerInitialState.score === 21;
+                    const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
+                    if (playerHasBj || dealerHasBj) {
+                        setGameState('end');
+                    } else {
+                        setGameState('player-turn');
+                    }
                 }
-            }
-        };
-        
-        dealInitialCards();
+            };
+            dealInitialSolo();
+        } else { // Counting Mode
+            let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
+            let tempDealerHand = [];
+            let cardsToDealCount = 15; // 7 players * 2 cards + 1 dealer card
+            
+            const dealCountingTable = () => {
+                if (cardsToDealCount > 0) {
+                    dealCard(card => {
+                        if (cardsToDealCount > 8) { // First card for each player
+                            tempTableHands[8 - (cardsToDealCount % 8)].cards.push(card);
+                        } else if (cardsToDealCount === 8) { // Dealer's up card
+                            tempDealerHand.push(card);
+                        } else { // Second card for each player
+                            tempTableHands[7 - cardsToDealCount].cards.push(card);
+                        }
+                        cardsToDealCount--;
+                        dealCountingTable();
+                    });
+                } else {
+                    dealCard(card => { // Dealer's hole card
+                        tempDealerHand.push({ ...card, isHidden: true });
+                        setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
+                        setDealerHand({ cards: tempDealerHand });
+                        setActiveTableHandIndex(0);
+                        setGameState('ai-turn');
+                    });
+                }
+            };
+            dealCountingTable();
+        }
 
-    }, [deck.length, isCutCardRevealed, createShoe, calculateScore, dealCard]);
+    }, [deck.length, isCutCardRevealed, createShoe, calculateScore, dealCard, gameMode]);
     
     // Player Actions
-    const handlePlayerAction = (actionCode, actionName) => {
-        if (gameState !== 'player-turn') return;
+    const executePlayerAction = useCallback((actionCode, actionName) => {
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const handIndex = gameMode === 'solo' ? activeHandIndex : playerSeat;
+        const handsUpdater = gameMode === 'solo' ? setPlayerHands : setTableHands;
 
-        const currentHandRef = playerHands[activeHandIndex];
+        const currentHandRef = hands[handIndex];
         const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
@@ -410,9 +439,9 @@ export default function App() {
             case 'D':
                 dealCard(card => {
                     if(!card) return;
-                    setPlayerHands(prevHands => {
+                    handsUpdater(prevHands => {
                         const newHands = JSON.parse(JSON.stringify(prevHands));
-                        const currentHand = newHands[activeHandIndex];
+                        const currentHand = newHands[handIndex];
                         currentHand.cards.push(card);
                         Object.assign(currentHand, calculateScore(currentHand.cards));
                         if(actionCode === 'D') currentHand.status = 'stood';
@@ -421,16 +450,16 @@ export default function App() {
                 });
                 break;
             case 'S': {
-                setPlayerHands(prevHands => {
+                handsUpdater(prevHands => {
                     const newHands = JSON.parse(JSON.stringify(prevHands));
-                    const currentHand = newHands[activeHandIndex];
+                    const currentHand = newHands[handIndex];
                     currentHand.status = 'stood';
                     return newHands;
                 });
                 break;
             }
             case 'P': {
-                const handToSplit = playerHands[activeHandIndex].cards;
+                const handToSplit = hands[handIndex].cards;
                 const isAces = handToSplit[0].rank === 'A';
                 
                 if (isAces) {
@@ -452,7 +481,16 @@ export default function App() {
             }
             default: break;
         }
-    };
+    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, gameMode, playerHands, playerSeat, tableHands]);
+
+    const handlePlayerAction = useCallback((actionCode, actionName) => {
+        if (gameMode === 'counting') {
+            setPendingPlayerAction({ actionCode, actionName });
+            setShowCountPrompt(true);
+        } else {
+            executePlayerAction(actionCode, actionName);
+        }
+    }, [gameMode, executePlayerAction]);
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
@@ -485,43 +523,92 @@ export default function App() {
     useEffect(() => {
         if (gameState !== 'player-turn') return;
 
-        const newHands = JSON.parse(JSON.stringify(playerHands));
-        const activeHand = newHands[activeHandIndex];
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const handsUpdater = gameMode === 'solo' ? setPlayerHands : setTableHands;
+        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
 
-        // Only check status if the hand has 2+ cards
+        const newHands = JSON.parse(JSON.stringify(hands));
+        const activeHand = newHands[index];
+
         if (activeHand && activeHand.cards.length >= 2) {
-            // Check for bust or 21 on the active hand
             if (activeHand.status === 'playing') {
                 if (activeHand.score > 21) activeHand.status = 'bust';
                 else if (activeHand.score === 21) activeHand.status = 'stood';
             }
         }
         
-        // If the active hand just finished, decide what to do next
         if (activeHand && activeHand.status !== 'playing') {
-            const nextHandIndex = newHands.findIndex((hand, index) => index > activeHandIndex && hand.status === 'playing');
-            
-            if (nextHandIndex !== -1) {
-                // There's another split hand to play
-                setActiveHandIndex(nextHandIndex);
-            } else {
-                // All player hands are finished, check if all busted
-                const allBusted = newHands.every(h => h.status === 'bust');
-                if (allBusted) {
-                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
-                    setTimeout(() => setGameState('end'), 500);
+             if (gameMode === 'solo') {
+                const nextHandIndex = newHands.findIndex((hand, i) => i > index && hand.status === 'playing');
+                if (nextHandIndex !== -1) {
+                    setActiveHandIndex(nextHandIndex);
                 } else {
-                    setGameState('dealer-turn');
+                    const allBusted = newHands.every(h => h.status === 'bust');
+                    if (allBusted) {
+                        setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
+                        setTimeout(() => setGameState('end'), 500);
+                    } else {
+                        setGameState('dealer-turn');
+                    }
                 }
+            } else { // Counting mode
+                setActiveTableHandIndex(prev => prev + 1);
+                setGameState('ai-turn');
             }
         }
         
-        // Update state if it has changed
-        if (JSON.stringify(newHands) !== JSON.stringify(playerHands)) {
-            setPlayerHands(newHands);
+        if (JSON.stringify(newHands) !== JSON.stringify(hands)) {
+            handsUpdater(newHands);
         }
 
-    }, [playerHands, gameState, activeHandIndex]);
+    }, [playerHands, tableHands, gameState, activeHandIndex, playerSeat, gameMode]);
+
+    // AI Turn Logic for Counting Mode
+    useEffect(() => {
+        if (gameState !== 'ai-turn') return;
+
+        if (activeTableHandIndex >= 7) {
+            setGameState('dealer-turn');
+            return;
+        }
+
+        if (activeTableHandIndex === playerSeat) {
+            setGameState('player-turn');
+            return;
+        }
+
+        const currentHand = tableHands[activeTableHandIndex];
+        const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
+        
+        const playAiHand = (hand) => {
+            const move = getBasicStrategy(hand.cards, dealerUpCard);
+            if (move === 'S' || hand.score >= 21) {
+                setTableHands(prev => {
+                    const newHands = [...prev];
+                    newHands[activeTableHandIndex].status = 'stood';
+                    return newHands;
+                });
+                setActiveTableHandIndex(prev => prev + 1);
+            } else {
+                dealCard(card => {
+                    if (card) {
+                        const newHandCards = [...hand.cards, card];
+                        const newHand = {...hand, cards: newHandCards, ...calculateScore(newHandCards) };
+                        setTableHands(prev => {
+                            const newHands = [...prev];
+                            newHands[activeTableHandIndex] = newHand;
+                            return newHands;
+                        });
+                        setTimeout(() => playAiHand(newHand), 1000);
+                    }
+                });
+            }
+        };
+
+        playAiHand(currentHand);
+
+    }, [gameState, activeTableHandIndex, playerSeat, tableHands, dealerHand.cards, calculateScore, dealCard]);
+
 
     // Dealer's Turn Logic
     useEffect(() => {
@@ -576,7 +663,9 @@ export default function App() {
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
             
-            const playerHasBj = playerHands.length === 1 && playerHands[0].cards.length === 2 && playerHands[0].score === 21;
+            const handsToEvaluate = gameMode === 'solo' ? playerHands : [tableHands[playerSeat]];
+            
+            const playerHasBj = handsToEvaluate.length === 1 && handsToEvaluate[0].cards.length === 2 && handsToEvaluate[0].score === 21;
             const dealerHasBj = dealerScoreInfo.score === 21 && revealedDealerHand.length === 2;
 
             let resultMessage = '';
@@ -594,7 +683,7 @@ export default function App() {
             } else if (dealerHasBj && playerHasBj) {
                 resultMessage = 'Push (Both have Blackjack).';
             } else {
-                 playerHands.forEach((hand, index) => {
+                 handsToEvaluate.forEach((hand, index) => {
                     resultMessage += `Hand ${index + 1}: `;
                     if (hand.status === 'bust') {
                         resultMessage += 'You lose (Busted). ';
@@ -622,7 +711,7 @@ export default function App() {
             setMessage(finalMessage);
             setHistory(prev => [{ text: resultMessage, isResult: true }, ...prev]);
         }
-    }, [gameState, playerHands, dealerHand.cards, calculateScore]);
+    }, [gameState, playerHands, tableHands, dealerHand.cards, calculateScore, gameMode, playerSeat]);
 
     // Auto-deal timer logic
     const dealCallback = useRef(dealNewGame);
@@ -645,6 +734,28 @@ export default function App() {
             return () => clearTimeout(timer);
         }
     }, [feedback]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (showCountPrompt) return;
+
+            if (gameState === 'player-turn') {
+                if (event.key.toLowerCase() === 'a') handlePlayerAction('H', 'Hit');
+                if (event.key.toLowerCase() === 's') handlePlayerAction('S', 'Stand');
+                if (event.key.toLowerCase() === 'd' && canDouble) handlePlayerAction('D', 'Double');
+                if (event.key.toLowerCase() === 'f' && canSplit) handlePlayerAction('P', 'Split');
+            }
+
+            if ((gameState === 'pre-deal' || gameState === 'end') && event.key === ' ') {
+                event.preventDefault();
+                dealNewGame();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
 
 
     // --- RENDER LOGIC ---
@@ -678,18 +789,26 @@ export default function App() {
             countFeedback += "❌ Incorrect.";
         }
         setFeedback(countFeedback);
+        if (pendingPlayerAction) {
+            executePlayerAction(pendingPlayerAction.actionCode, pendingPlayerAction.actionName);
+            setPendingPlayerAction(null);
+        }
     };
 
     const canSplit = useMemo(() => {
-        if (!playerHands[activeHandIndex]) return false;
-        const cards = playerHands[activeHandIndex].cards;
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
+        if (!hands[index]) return false;
+        const cards = hands[index].cards;
         return cards.length === 2 && cards[0].rank === cards[1].rank;
-    }, [playerHands, activeHandIndex]);
+    }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
 
     const canDouble = useMemo(() => {
-        if (!playerHands[activeHandIndex]) return false;
-        return playerHands[activeHandIndex].cards.length === 2;
-    }, [playerHands, activeHandIndex]);
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
+        if (!hands[index]) return false;
+        return hands[index].cards.length === 2;
+    }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
 
     if (!gameMode) {
         return (
@@ -764,18 +883,15 @@ export default function App() {
                         ) : (
                              <div className="text-center">
                                 <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
-                                <div className="grid grid-cols-4 gap-4">
+                                <div className="grid grid-cols-4 gap-2">
                                     {tableHands.map((hand, i) => (
-                                        <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <h3 className="font-bold">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.score}</h3>
-                                            <div className="flex justify-center items-center space-x-1 mt-1">
+                                        <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex ? 'ring-2 ring-blue-400' : ''}`}>
+                                            <h3 className="font-bold text-sm">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.display}</h3>
+                                            <div className="flex justify-center items-center space-x-1 mt-1 min-h-[152px]">
                                                 {hand.cards.map((card, j) => <div key={j} className="transform scale-75"><Card {...card} /></div>)}
                                             </div>
                                         </div>
                                     ))}
-                                    <div className={`p-2 rounded-lg col-start-4`}>
-                                        {isCutCardRevealed && <div className="transform scale-75"><Card isCutCard={true} /></div>}
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -787,9 +903,6 @@ export default function App() {
                              <button
                                  key={actionName}
                                  onClick={() => {
-                                     if (gameMode === 'counting' && actionCode !== 'S') {
-                                         setShowCountPrompt(true);
-                                     }
                                      handlePlayerAction(actionCode, actionName);
                                  }}
                                  disabled={gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
