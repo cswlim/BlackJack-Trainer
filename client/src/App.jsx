@@ -150,7 +150,7 @@ const Card = ({ suit, rank, isHidden, isCutCard }) => {
     );
 };
 
-const CountPromptModal = ({ onConfirm, onCancel }) => {
+const CountPromptModal = ({ onConfirm }) => {
     const [count, setCount] = useState('');
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -357,105 +357,163 @@ export default function App() {
         });
     }, [cutCardPosition]);
 
- const dealNewGame = useCallback(() => {
-        // This function is called when the user clicks "Deal".
-        // It should either deal a new hand from the current shoe,
-        // or create a new shoe and then deal the first hand from it.
+    const dealNewGame = useCallback(() => {
+        const performDeal = () => {
+            endOfRoundMessageSet.current = false;
+            lastActionFeedback.current = '';
+            setMessage('');
+            setFeedback('');
+            setActiveHandIndex(0);
+            
+            if (gameMode === 'solo') {
+                let cardsToDeal = [];
+                let dealtCount = 0;
+                const dealInitialSolo = () => {
+                    if (dealtCount < 4) {
+                        dealCard(card => {
+                            cardsToDeal.push(card);
+                            dealtCount++;
+                            dealInitialSolo();
+                        });
+                    } else {
+                        const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
+                        const tempPlayerHand = [playerCard1, playerCard2];
+                        const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+                        const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
+                        setPlayerHands([playerInitialState]);
+                        setDealerHand({ cards: tempDealerHand });
+                        const playerHasBj = playerInitialState.score === 21;
+                        const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
+                        if (playerHasBj || dealerHasBj) {
+                            setGameState('end');
+                        } else {
+                            setGameState('player-turn');
+                        }
+                    }
+                };
+                dealInitialSolo();
+            } else { // Counting Mode
+                let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
+                let tempDealerHand = [];
+                let cardsToDealCount = 15;
+                
+                const dealCountingTable = () => {
+                    if (cardsToDealCount > 0) {
+                        dealCard(card => {
+                            if (cardsToDealCount > 8) {
+                                tempTableHands[15 - cardsToDealCount].cards.push(card);
+                            } else if (cardsToDealCount === 8) {
+                                tempDealerHand.push(card);
+                            } else {
+                                tempTableHands[7 - cardsToDealCount].cards.push(card);
+                            }
+                            
+                            cardsToDealCount--;
+                            dealCountingTable();
+                        });
+                    } else {
+                        dealCard(card => {
+                            tempDealerHand.push({ ...card, isHidden: true });
+                            setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
+                            setDealerHand({ cards: tempDealerHand });
+                            setActiveTableHandIndex(0);
+                            setGameState('ai-turn');
+                        });
+                    }
+                };
+                
+                dealCountingTable();
+            }
+        };
 
-        const performDeal = () => {
-            endOfRoundMessageSet.current = false;
-            lastActionFeedback.current = '';
-            setMessage('');
-            setFeedback('');
-            setActiveHandIndex(0);
-            
-            if (gameMode === 'solo') {
-                let cardsToDeal = [];
-                let dealtCount = 0;
-                const dealInitialSolo = () => {
-                    if(dealtCount < 4) {
-                        dealCard(card => {
-                            cardsToDeal.push(card);
-                            dealtCount++;
-                            dealInitialSolo();
-                        });
-                    } else {
-                        const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
-                        const tempPlayerHand = [playerCard1, playerCard2];
-                        const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
-                        const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-                        setPlayerHands([playerInitialState]);
-                        setDealerHand({ cards: tempDealerHand });
-                        const playerHasBj = playerInitialState.score === 21;
-                        const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
-                        if (playerHasBj || dealerHasBj) {
-                            setGameState('end');
-                        } else {
-                            setGameState('player-turn');
-                        }
-                    }
-                };
-                dealInitialSolo();
-            } else { // Counting Mode
-                let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
-                let tempDealerHand = [];
-                let cardsToDealCount = 15; // 7 players * 2 cards + 1 dealer up-card
-                
-                const dealCountingTable = () => {
-                    if (cardsToDealCount > 0) {
-                        dealCard(card => {
-                            // First card for each player (counts 15 down to 9)
-                            if (cardsToDealCount > 8) {
-                                // FIX: Corrected indexing logic for dealing the first card to players.
-                                tempTableHands[15 - cardsToDealCount].cards.push(card);
-                            }
-                            // Dealer's up card (count is 8)
-                            else if (cardsToDealCount === 8) {
-                                tempDealerHand.push(card);
-                            }
-                            // Second card for each player (counts 7 down to 1)
-                            else {
-                                // FIX: Completed the incomplete line.
-                                tempTableHands[7 - cardsToDealCount].cards.push(card);
-              _B ug Fix:_ The first card deal was broken due to a faulty condition in the `dealNewGame` function. This has been corrected by simplifying the logic to ensure a reshuffle only occurs when the cut card is revealed, allowing the initial deal and subsequent hands to proceed correctly.
-              }
-                            
-                            cardsToDealCount--;
-                            dealCountingTable(); // Recursive call to continue dealing
-                        });
-                    } else {
-                        // Final card is the dealer's hole card
-                        dealCard(card => {
-                            tempDealerHand.push({ ...card, isHidden: true });
-                            // Finalize hands and set game state
-                            setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
-                _What I fixed:_ I've replaced your `dealNewGame` function with a more robust version. The original function had a flawed `if` condition that incorrectly triggered a reshuffle on the very first deal, preventing the cards from being dealt. The new version fixes this by:
-1.  **Checking for Reshuffle First:** It only runs `createShoe()` if the cut card has actually been revealed.
-2.  **Dealing Consistently:** It then proceeds to deal the cards, whether it's the first hand of a new shoe or just the next hand in the sequence.
+        if (isCutCardRevealed) {
+            createShoe();
+            setTimeout(performDeal, 100);
+        } else {
+            performDeal();
+        }
+    }, [isCutCardRevealed, gameMode, createShoe, calculateScore, dealCard]);
+    
+    // Player Actions
+    const executePlayerAction = useCallback((actionCode, actionName) => {
+        setIsActionDisabled(true);
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const handIndex = gameMode === 'solo' ? activeHandIndex : playerSeat;
+        const handsUpdater = gameMode === 'solo' ? setPlayerHands : setTableHands;
 
-This eliminates the bug and improves the user experience by making the reshuffle process seamless and requiring only one click.
-              setDealerHand({ cards: tempDealerHand });
-                            setActiveTableHandIndex(0);
-                            setGameState('ai-turn');
-                        });
-                    }
-                };
-                
-                dealCountingTable();
-            }
-        };
+        const currentHandRef = hands[handIndex];
+        const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
+        const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
+        
+        const isCorrect = actionCode === correctMove;
+        const handInfo = `Hand (${currentHandRef.display}): `;
+        const feedbackText = `${handInfo}Your move: ${actionName}. Strategy: ${correctMove}.`;
+        const historyItem = { text: feedbackText, correct: isCorrect };
 
-        // If the cut card was revealed in the last hand, we must create a new shoe first.
-        // The `createShoe` function is asynchronous (it sets state), so we wait with a timeout
-        // before dealing cards from the new shoe.
-        if (isCutCardRevealed) {
-            createShoe();
-            setTimeout(performDeal, 100);
-        } else {
-            // Otherwise, just deal the next hand from the existing shoe.
-            performDeal();
-        }
-    }, [isCutCardRevealed, gameMode, createShoe, calculateScore, dealCard]);
+        setHistory(prevHistory => [historyItem, ...prevHistory]);
+        if (isCorrect) {
+            setCorrectCount(prev => prev + 1);
+            setStreakCount(prev => prev + 1);
+            lastActionFeedback.current = "Correct!";
+        } else {
+            setIncorrectCount(prev => prev + 1);
+            setStreakCount(0);
+            lastActionFeedback.current = "Incorrect.";
+        }
+        setFeedback(`${feedbackText} ${isCorrect ? '✅' : '❌'}`);
+
+        switch(actionCode) {
+            case 'H':
+            case 'D':
+                dealCard(card => {
+                    if(!card) return;
+                    handsUpdater(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        const currentHand = newHands[handIndex];
+                        currentHand.cards.push(card);
+                        Object.assign(currentHand, calculateScore(currentHand.cards));
+                        if(actionCode === 'D') currentHand.status = 'stood';
+                        return newHands;
+                    });
+                });
+                break;
+            case 'S': {
+                handsUpdater(prevHands => {
+                    const newHands = JSON.parse(JSON.stringify(prevHands));
+                    const currentHand = newHands[handIndex];
+                    currentHand.status = 'stood';
+                    return newHands;
+                });
+                break;
+            }
+            case 'P': {
+                const handToSplit = hands[handIndex].cards;
+                const isAces = handToSplit[0].rank === 'A';
+                
+                if (isAces) {
+                    dealCard(card1 => {
+                        dealCard(card2 => {
+                            const hand1 = { cards: [handToSplit[0], card1], status: 'stood' };
+                            const hand2 = { cards: [handToSplit[1], card2], status: 'stood' };
+                            Object.assign(hand1, calculateScore(hand1.cards));
+                            Object.assign(hand2, calculateScore(hand2.cards));
+                            setPlayerHands([hand1, hand2]);
+                        });
+                    });
+                } else {
+                    const newHands = JSON.parse(JSON.stringify(playerHands));
+                    newHands.splice(activeHandIndex, 1, 
+                        { cards: [handToSplit[0]], status: 'playing' },
+                        { cards: [handToSplit[1]], status: 'playing' }
+                    );
+                    setPlayerHands(newHands);
+                }
+                break;
+            }
+            default: break;
+        }
+    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, gameMode, playerHands, playerSeat, tableHands]);
+
     const handlePlayerAction = useCallback((actionCode, actionName) => {
         if (gameMode === 'counting') {
             setPendingPlayerAction({ actionCode, actionName });
@@ -658,7 +716,7 @@ This eliminates the bug and improves the user experience by making the reshuffle
             
             const handsToEvaluate = gameMode === 'solo' ? playerHands : [tableHands[playerSeat]];
             
-            const playerHasBj = handsToEvaluate.length === 1 && handsToEvaluate[0].cards.length === 2 && handsToEvaluate[0].score === 21;
+            const playerHasBj = handsToEvaluate.length === 1 && handsToEvaluate[0]?.cards.length === 2 && handsToEvaluate[0]?.score === 21;
             const dealerHasBj = dealerScoreInfo.score === 21 && revealedDealerHand.length === 2;
 
             let resultMessage = '';
@@ -678,7 +736,8 @@ This eliminates the bug and improves the user experience by making the reshuffle
                 resultMessage = 'Push (Both have Blackjack).';
                 pushes++;
             } else {
-                 handsToEvaluate.forEach((hand, index) => {
+                handsToEvaluate.forEach((hand, index) => {
+                    if (!hand) return;
                     resultMessage += `Hand ${index + 1}: `;
                     if (hand.status === 'bust') {
                         resultMessage += 'You lose (Busted). ';
@@ -724,10 +783,10 @@ This eliminates the bug and improves the user experience by making the reshuffle
             if (showCountPrompt) return;
 
             if (gameState === 'player-turn') {
-                if (event.key.toLowerCase() === 'a' || event.key.toLowerCase() === 'j') handlePlayerAction('H', 'Hit');
+                if (event.key.toLowerCase() === 'h' || event.key.toLowerCase() === 'j') handlePlayerAction('H', 'Hit');
                 if (event.key.toLowerCase() === 's' || event.key.toLowerCase() === 'k') handlePlayerAction('S', 'Stand');
                 if ((event.key.toLowerCase() === 'd' || event.key.toLowerCase() === 'l') && canDouble) handlePlayerAction('D', 'Double');
-                if ((event.key.toLowerCase() === 'f' || event.key === ';') && canSplit) handlePlayerAction('P', 'Split');
+                if ((event.key.toLowerCase() === 'p' || event.key === ';') && canSplit) handlePlayerAction('P', 'Split');
             }
 
             if ((gameState === 'pre-deal' || gameState === 'end') && event.key === ' ') {
@@ -808,7 +867,7 @@ This eliminates the bug and improves the user experience by making the reshuffle
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
                         {/* Dealer's Hand */}
                         <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' ? dealerHand.display : ''}</h2>
+                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `(${dealerHand.display})` : ''}</h2>
                             <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
@@ -824,11 +883,9 @@ This eliminates the bug and improves the user experience by making the reshuffle
                                     Deal
                                 </button>
                             }
-                            {(feedback || message) && gameState !== 'pre-deal' && gameState !== 'end' &&
-                                <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
-                                    {feedback || message}
-                                </p>
-                            }
+                             <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
+                                {feedback || message || 'Make your decision.'}
+                            </p>
                         </div>
 
                         {/* Player Area */}
@@ -837,7 +894,7 @@ This eliminates the bug and improves the user experience by making the reshuffle
                                 <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <h3 className="font-bold">{hand.display} {hand.status !== 'playing' && `(${hand.status})`}</h3>
+                                            <h3 className="font-bold text-xl mb-1">Your Hand {playerHands.length > 1 ? `(#${i + 1})` : ''} ({hand.display}) {hand.status !== 'playing' && `(${hand.status})`}</h3>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
@@ -848,12 +905,12 @@ This eliminates the bug and improves the user experience by making the reshuffle
                         ) : (
                              <div className="text-center">
                                 <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
                                     {tableHands.map((hand, i) => (
-                                        <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex ? 'ring-2 ring-blue-400' : ''}`}>
+                                        <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex && gameState === 'ai-turn' ? 'ring-2 ring-blue-400' : ''}`}>
                                             <h3 className="font-bold text-sm">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.display}</h3>
-                                            <div className="flex justify-center items-center space-x-1 mt-1 min-h-[152px]">
-                                                {hand.cards.map((card, j) => <div key={j} className="transform scale-75"><Card {...card} /></div>)}
+                                            <div className="flex justify-center items-center -space-x-12 mt-1 min-h-[120px] scale-75">
+                                                {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
                                         </div>
                                     ))}
@@ -864,12 +921,10 @@ This eliminates the bug and improves the user experience by making the reshuffle
                     
                     {/* Action Buttons */}
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
+                         {[['Hit', 'H', 'h', 'j'], ['Stand', 'S', 's', 'k'], ['Double', 'D', 'd', 'l'], ['Split', 'P', 'p', ';']].map(([actionName, actionCode, ...keys]) => (
                              <button
                                  key={actionName}
-                                 onClick={() => {
-                                     handlePlayerAction(actionCode, actionName);
-                                 }}
+                                 onClick={() => handlePlayerAction(actionCode, actionName)}
                                  disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
                                  className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
                                      ${actionCode === 'H' && 'bg-green-500 text-white'}
@@ -877,18 +932,24 @@ This eliminates the bug and improves the user experience by making the reshuffle
                                      ${actionCode === 'D' && 'bg-orange-400 text-white'}
                                      ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
                              >
-                                 {actionName}
+                                 <div className="flex flex-col">
+                                     <span>{actionName}</span>
+                                     <span className="text-xs font-mono opacity-70">({keys.join('/')})</span>
+                                 </div>
                              </button>
                          ))}
                     </div>
                 </div>
-                {gameMode === 'solo' && <div className="w-full md:w-64"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} /><StreakCounter streak={streakCount} /></div>}
+                {<div className="w-full md:w-72 mt-4 md:mt-0 flex-shrink-0"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} /><StreakCounter streak={streakCount} /></div>}
             </div>
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                 body {
                     font-family: 'Nunito', sans-serif;
+                }
+                .font-mono {
+                    font-family: 'Roboto Mono', monospace;
                 }
                 @keyframes deal {
                     from { opacity: 0; transform: translateY(-20px) scale(0.8); }
@@ -916,9 +977,9 @@ This eliminates the bug and improves the user experience by making the reshuffle
                 }
                 .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
                  @keyframes super-saiyan {
-                    0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
-                    50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
-                }
+                     0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
+                     50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
+                 }
                 .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; }
             `}</style>
         </div>
