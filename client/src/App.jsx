@@ -152,24 +152,24 @@ const getCardCountValue = (card) => {
 
 const Card = ({ suit, rank, isHidden, isCutCard }) => {
     if (isCutCard) {
-        return <div className="w-24 h-36 md:w-32 md:h-44 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold">CUT</div>;
+        return <div className="flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold text-xs sm:text-base">CUT</div>;
     }
     if (isHidden) {
-        return <div className="w-24 h-36 md:w-32 md:h-44 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-20 h-32 md:w-28 md:h-40 bg-gray-600 rounded-md"></div></div>;
+        return <div className="flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-14 h-20 sm:w-20 sm:h-32 md:w-28 md:h-40 bg-gray-600 rounded-md"></div></div>;
     }
     const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
     return (
-        <div className="relative w-24 h-36 md:w-32 md:h-44 bg-white rounded-lg border border-gray-200 shadow-md p-2 transition-all transform animate-deal">
-            <div className={`absolute top-1 left-2 text-center leading-none ${suitColor}`}>
-                <p className="text-2xl font-bold">{rank}</p>
-                <p className="text-xl">{suit}</p>
+        <div className="relative flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 bg-white rounded-lg border border-gray-200 shadow-md p-1 sm:p-2 transition-all transform animate-deal">
+            <div className={`absolute top-0.5 left-1 text-center leading-none ${suitColor}`}>
+                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
+                <p className="text-base sm:text-xl">{suit}</p>
             </div>
-            <div className={`absolute inset-0 flex items-center justify-center text-5xl md:text-6xl ${suitColor}`}>
+            <div className={`absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-6xl ${suitColor}`}>
                 {suit}
             </div>
-            <div className={`absolute bottom-1 right-2 text-center leading-none rotate-180 ${suitColor}`}>
-                <p className="text-2xl font-bold">{rank}</p>
-                <p className="text-xl">{suit}</p>
+            <div className={`absolute bottom-0.5 right-1 text-center leading-none rotate-180 ${suitColor}`}>
+                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
+                <p className="text-base sm:text-xl">{suit}</p>
             </div>
         </div>
     );
@@ -672,7 +672,7 @@ export default function App() {
         
         // Update feedback message
         if (isCorrect) {
-            setFeedback('✅'); // Use the heavy check mark emoji
+            setFeedback('✔️'); // Use the heavy check mark emoji
             setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
@@ -1125,7 +1125,7 @@ export default function App() {
 
                         {gameMode === 'solo' ? (
                             <div className="text-center">
-                                <div className="flex flex-wrap justify-center items-start gap-4">
+                                <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2"> {/* Adjusted gap */}
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
                                             <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
@@ -1141,7 +1141,7 @@ export default function App() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
+                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2 min-h-[152px] md:min-h-[188px]"> {/* Added flex-wrap and adjusted gaps */}
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
                                             {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
@@ -1168,7 +1168,7 @@ export default function App() {
                                                 <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">
                                                     {i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.status === 'bust' ? 'Bust' : hand.display}
                                                 </h3>
-                                                <div className="flex justify-center items-center -space-x-12 mt-1 min-h-[120px] scale-75">
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1 min-h-[120px] scale-75"> {/* Added flex-wrap and adjusted gaps */}
                                                     {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                                 </div>
                                                 {/* Transparent Deal Button for Counting Mode (only on player's seat) - Active only at end of round */}
