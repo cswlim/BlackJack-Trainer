@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
- 
+
 // --- HELPER FUNCTIONS & DATA ---
 
 const getBasicStrategy = (playerHand, dealerUpCard) => {
@@ -810,7 +810,7 @@ export default function App() {
                 <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
                 <div className="flex space-x-4">
                     <button onClick={() => selectMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Solo Mode</button>
-                 { /*<button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>*/}
+                    <button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>
                 </div>
             </div>
         );
@@ -851,7 +851,13 @@ export default function App() {
                         </div>
 
                         {gameMode === 'solo' ? (
-                            <div className="text-center">
+                            <div className="text-center relative">
+                                {(gameState === 'pre-deal' || gameState === 'end') && (
+                                    <div 
+                                        className="absolute inset-0 cursor-pointer z-10"
+                                        onClick={dealNewGame}
+                                    />
+                                )}
                                 <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
