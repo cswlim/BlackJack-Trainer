@@ -739,10 +739,10 @@ export default function App() {
             if (showCountPrompt) return;
 
             if (gameState === 'player-turn') {
-                if (event.key.toLowerCase() === 'a') handlePlayerAction('H', 'Hit');
-                if (event.key.toLowerCase() === 's') handlePlayerAction('S', 'Stand');
-                if (event.key.toLowerCase() === 'd' && canDouble) handlePlayerAction('D', 'Double');
-                if (event.key.toLowerCase() === 'f' && canSplit) handlePlayerAction('P', 'Split');
+                if (event.key.toLowerCase() === 'a' || event.key.toLowerCase() === 'j') handlePlayerAction('H', 'Hit');
+                if (event.key.toLowerCase() === 's' || event.key.toLowerCase() === 'k') handlePlayerAction('S', 'Stand');
+                if ((event.key.toLowerCase() === 'd' || event.key.toLowerCase() === 'l') && canDouble) handlePlayerAction('D', 'Double');
+                if ((event.key.toLowerCase() === 'f' || event.key === ';') && canSplit) handlePlayerAction('P', 'Split');
             }
 
             if ((gameState === 'pre-deal' || gameState === 'end') && event.key === ' ') {
@@ -848,7 +848,6 @@ export default function App() {
                         {/* Player Area */}
                         {gameMode === 'solo' ? (
                             <div className="text-center">
-                                <h2 className="text-xl font-semibold mb-2">Your Hand(s)</h2>
                                 <div className="flex justify-center items-start space-x-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
@@ -879,20 +878,21 @@ export default function App() {
                     
                     {/* Action Buttons */}
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
+                         {[['Hit', 'H', 'A/J'], ['Stand', 'S', 'S/K'], ['Double', 'D', 'D/L'], ['Split', 'P', 'F/;']].map(([actionName, actionCode, shortcuts]) => (
                              <button
                                  key={actionName}
                                  onClick={() => {
                                      handlePlayerAction(actionCode, actionName);
                                  }}
                                  disabled={gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                 className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                 className={`px-4 py-2 md:px-6 md:py-3 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center leading-tight
                                      ${actionCode === 'H' && 'bg-green-500 text-white'}
                                      ${actionCode === 'S' && 'bg-red-500 text-white'}
                                      ${actionCode === 'D' && 'bg-orange-400 text-white'}
                                      ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
                              >
-                                 {actionName}
+                                 <span>{actionName}</span>
+                                 <span className="text-xs font-mono opacity-75 mt-1">{shortcuts}</span>
                              </button>
                          ))}
                     </div>
