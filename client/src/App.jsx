@@ -160,16 +160,8 @@ const Card = ({ suit, rank, isHidden, isCutCard }) => {
     const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
     return (
         <div className="relative flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-white rounded-lg border border-gray-200 shadow-md p-1 sm:p-2 transition-all transform animate-deal">
-            <div className={`absolute top-0.5 left-1 text-center leading-none ${suitColor}`}>
-                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
-                <p className="text-base sm:text-xl">{suit}</p>
-            </div>
-            <div className={`absolute inset-0 flex items-center justify-center text-[clamp(2.5rem,10vw,4rem)] sm:text-5xl md:text-6xl ${suitColor}`}> {/* Adjusted font size with clamp */}
+            <div className={`absolute inset-0 flex items-center justify-center text-[clamp(2.5rem,10vw,4rem)] sm:text-5xl md:text-6xl ${suitColor}`}>
                 {suit}
-            </div>
-            <div className={`absolute bottom-0.5 right-1 text-center leading-none rotate-180 ${suitColor}`}>
-                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
-                <p className="text-base sm:text-xl">{suit}</p>
             </div>
         </div>
     );
@@ -263,7 +255,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
     // Hard totals from the provided chart, including 5-7 as a range
     const hardTotals = ['5-7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
     const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
-    const pairs = ['2,2', '3,3', '4,4', '5,5', '6,6', '7,7', '8,8', '9,9', '10,10', 'A,A'];
+    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As']; // Updated pairs notation
 
     // Strategy data matching the provided image
     const strategyData = {
@@ -291,16 +283,16 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             'A,2': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
         },
         pairs: {
-            'A,A': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-            '10,10': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-            '9,9': ['P', 'P', 'P', 'P', 'P', 'S', 'P', 'P', 'S', 'S'],
-            '8,8': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-            '7,7': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
-            '6,6': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
-            '5,5': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
-            '4,4': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'], // Changed 4,4 vs 4 from P to H
-            '3,3': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
-            '2,2': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            'As': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            '10s': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            '9s': ['P', 'P', 'P', 'P', 'P', 'S', 'P', 'P', 'S', 'S'],
+            '8s': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            '7s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            '6s': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
+            '5s': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
+            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'], // Changed 4,4 vs 4 from P to H
+            '3s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            '2s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
         }
     };
 
@@ -312,7 +304,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
         // Handle pairs (normalize J,Q,K to 10)
         if (hand.length === 2 && ranks[0] === ranks[1]) {
             const normalizedRank = ['J', 'Q', 'K'].includes(ranks[0]) ? '10' : ranks[0];
-            return `${normalizedRank},${normalizedRank}`;
+            return `${normalizedRank}s`; // Use 's' suffix
         }
         // Handle soft totals
         if (isSoft) {
@@ -374,7 +366,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -407,7 +399,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -440,7 +432,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
