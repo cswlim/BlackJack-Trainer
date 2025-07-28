@@ -159,7 +159,7 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
-const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount }) => {
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount, cardsDealt }) => {
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
@@ -179,6 +179,9 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
                     <div className="flex gap-3">
                         <span className="text-yellow-400">P-BJ: {playerBjCount}</span>
                         <span className="text-purple-400">D-BJ: {dealerBjCount}</span>
+                    </div>
+                     <div className="flex gap-3">
+                        <span className="text-white">Cards: {cardsDealt}</span>
                     </div>
                 </div>
             </div>
@@ -237,6 +240,7 @@ export default function App() {
     const [pushCount, setPushCount] = useState(0);
     const [playerBjCount, setPlayerBjCount] = useState(0);
     const [dealerBjCount, setDealerBjCount] = useState(0);
+    const [cardsDealt, setCardsDealt] = useState(0);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
@@ -267,6 +271,7 @@ export default function App() {
         setRunningCount(0);
         setIsCutCardRevealed(false);
         setShowCutCardOnTable(false);
+        setCardsDealt(0);
     }, []);
 
     // --- HAND SCORE CALCULATION ---
@@ -320,6 +325,7 @@ export default function App() {
             }
             const card = newDeck.pop();
             setRunningCount(prev => prev + getCardCountValue(card));
+            setCardsDealt(prev => prev + 1);
             callback(card);
             return newDeck;
         });
