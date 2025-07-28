@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
- 
+
 // --- HELPER FUNCTIONS & DATA ---
 
 const getBasicStrategy = (playerHand, dealerUpCard) => {
@@ -219,7 +219,7 @@ const StreakCounter = ({ streak }) => {
     };
 
     return (
-        <div className={`mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 ${getStreakClass()}`}>
+        <div className={`mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 ${getStreakClass()}`}>
             <span className="text-2xl">🔥</span>
             <span className="text-xl font-bold">{streak} Streak!</span>
         </div>
@@ -252,6 +252,7 @@ export default function App() {
 
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
+    const [isFeedbackCorrect, setIsFeedbackCorrect] = useState(false); // New state for feedback color
     const [history, setHistory] = useState([]);
     const [correctCount, setCorrectCount] = useState(0);
     const [incorrectCount, setIncorrectCount] = useState(0);
@@ -347,6 +348,7 @@ export default function App() {
             lastActionFeedback.current = '';
             setMessage('');
             setFeedback('');
+            setIsFeedbackCorrect(false); // Reset feedback color
             setActiveHandIndex(0);
             
             if (gameMode === 'solo') {
@@ -429,21 +431,25 @@ export default function App() {
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
         const isCorrect = actionCode === correctMove;
-        const handInfo = `Hand ${currentHandRef.display}: `;
-        const feedbackText = `${handInfo}Your move: ${actionName}. Strategy: ${correctMove}.`;
-        const historyItem = { text: feedbackText, correct: isCorrect };
-
-        setHistory(prevHistory => [historyItem, ...prevHistory]);
+        
+        // Update feedback message
         if (isCorrect) {
+            setFeedback('✔'); // Use the heavy check mark emoji
+            setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
             lastActionFeedback.current = "Correct!";
         } else {
+            setFeedback(`❌ Correct move: ${correctMove}`);
+            setIsFeedbackCorrect(false); // Set false for incorrect feedback
             setIncorrectCount(prev => prev + 1);
             setStreakCount(0);
             lastActionFeedback.current = "Incorrect.";
         }
-        setFeedback(`${feedbackText} ${isCorrect ? '✅' : '❌'}`);
+        
+        const historyItem = { text: `Hand ${currentHandRef.display}: Your move: ${actionName}. Strategy: ${correctMove}.`, correct: isCorrect };
+        setHistory(prevHistory => [historyItem, ...prevHistory]);
+
 
         switch(actionCode) {
             case 'H':
@@ -626,7 +632,7 @@ export default function App() {
                             newHands[activeTableHandIndex] = newHand;
                             return newHands;
                         });
-                        setTimeout(() => playAiHand(newHand), 1000);
+                        setTimeout(() => playAiHand(newHand), 300); // Reduced delay for AI
                     }
                 });
             }
@@ -658,7 +664,7 @@ export default function App() {
                                     ...calculateScore([...prev.cards, card])
                                 }));
                                 dealerDrawLoop();
-                            }, 1000);
+                            }, 300); // Reduced delay for dealer
                         } else {
                             setGameState('end');
                         }
@@ -671,7 +677,9 @@ export default function App() {
             });
         };
         
-        setTimeout(dealerDrawLoop, 1000);
+        // No initial setTimeout here, as the hidden card is revealed immediately above.
+        // The loop itself handles subsequent card draws with a delay.
+        dealerDrawLoop(); 
 
     }, [gameState, calculateScore, dealCard]);
     
@@ -810,7 +818,7 @@ export default function App() {
                 <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
                 <div className="flex space-x-4">
                     <button onClick={() => selectMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Solo Mode</button>
-                 { /*<button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>*/}
+                   { /*<button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>*/}
                 </div>
             </div>
         );
@@ -834,8 +842,9 @@ export default function App() {
                             </div>
                         </div>
 
-                        <div className="text-center my-1 h-16 flex items-center justify-center">
-                            {(gameState === 'pre-deal' || gameState === 'end') && (
+                        {/* Central Deal Button / Feedback Message */}
+                        <div className="text-center my-0 h-10 flex items-center justify-center"> {/* Adjusted height and removed vertical margin */}
+                            {(gameState === 'pre-deal' || gameState === 'pre-game') && (
                                 <button 
                                     onClick={dealNewGame} 
                                     className="bg-blue-500 text-white font-semibold px-8 py-4 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400 text-xl"
@@ -843,9 +852,10 @@ export default function App() {
                                     Deal
                                 </button>
                             )}
-                            {(feedback || message) && gameState !== 'pre-deal' && gameState !== 'end' && (
-                                <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
-                                    {feedback || message}
+                            {/* Concise feedback message */}
+                            {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
+                                <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}> {/* Changed text-3xl to text-2xl */}
+                                    {feedback}
                                 </p>
                             )}
                         </div>
@@ -854,8 +864,8 @@ export default function App() {
                             <div className="text-center">
                                 <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
-                                        <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <div className="font-bold text-xl mb-1 text-center h-14">
+                                        <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
+                                            <div className="font-bold text-xl text-center h-8 flex flex-col justify-center"> {/* Changed h-14 to h-8 and added flex for vertical centering */}
                                                 <div className="flex justify-center items-center gap-2">
                                                     <span>
                                                         {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
@@ -867,49 +877,82 @@ export default function App() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                {hand.status !== 'playing' && (
-                                                    <p className="text-base text-gray-400 capitalize">{hand.status}</p>
+                                                {/* Only display 'bust' status */}
+                                                {hand.status === 'bust' && (
+                                                    <p className="text-base text-red-400 capitalize">Bust</p>
                                                 )}
                                             </div>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
+                                            {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
+                                            {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
+                                                <button
+                                                    onClick={dealNewGame}
+                                                    disabled={gameState !== 'end'}
+                                                    className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                                ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                transition-all duration-300`}
+                                                >
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         ) : (
-                             <div className="text-center">
-                                <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
-                                <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
-                                    {tableHands.map((hand, i) => (
-                                        <div key={i} className={`p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex && gameState === 'ai-turn' ? 'ring-2 ring-blue-400' : ''}`}>
-                                            <h3 className="font-bold text-sm">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.display}</h3>
-                                            <div className="flex justify-center items-center -space-x-12 mt-1 min-h-[120px] scale-75">
-                                                {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                <div className="text-center">
+                                    <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
+                                    <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
+                                        {tableHands.map((hand, i) => (
+                                            <div key={i} className={`relative p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex && gameState === 'ai-turn' ? 'ring-2 ring-blue-400' : ''}`}>
+                                                <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.display}
+                                                    {/* Only display 'bust' status */}
+                                                    {hand.status === 'bust' && (
+                                                        <p className="text-base text-red-400 capitalize">Bust</p>
+                                                    )}
+                                                </h3>
+                                                <div className="flex justify-center items-center -space-x-12 mt-1 min-h-[120px] scale-75">
+                                                    {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                                </div>
+                                                {/* Transparent Deal Button for Counting Mode (only on player's seat) - Active only at end of round */}
+                                                {gameMode === 'counting' && i === playerSeat && (gameState !== 'pre-deal' && gameState !== 'pre-game') && (
+                                                    <button
+                                                        onClick={dealNewGame}
+                                                        disabled={gameState !== 'end'}
+                                                        className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                                    ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                    transition-all duration-300`}
+                                                    >
+                                                    </button>
+                                                )}
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
                         )}
                     </div>
                     
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
-                             <button
-                                 key={actionName}
-                                 onClick={() => handlePlayerAction(actionCode, actionName)}
-                                 disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                 className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
-                                     ${actionCode === 'H' && 'bg-green-500 text-white'}
-                                     ${actionCode === 'S' && 'bg-red-500 text-white'}
-                                     ${actionCode === 'D' && 'bg-orange-400 text-white'}
-                                     ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
-                             >
-                                 {actionName}
-                             </button>
-                         ))}
+                            {[
+                                ['Hit', 'H'], 
+                                ['Stand', 'S'], 
+                                ['Double', 'D'], 
+                                ['Split', 'P']
+                            ].map(([actionName, actionCode]) => (
+                                <button
+                                    key={actionName}
+                                    onClick={() => handlePlayerAction(actionCode, actionName)}
+                                    disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
+                                    className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                        ${actionCode === 'H' && 'bg-green-500 text-white'}
+                                        ${actionCode === 'S' && 'bg-red-500 text-white'}
+                                        ${actionCode === 'D' && 'bg-orange-400 text-white'}
+                                        ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
+                                >
+                                    {actionName}
+                                </button>
+                            ))}
                     </div>
                 </div>
                 <div className="w-full md:w-72 mt-4 md:mt-0 flex-shrink-0">
@@ -952,9 +995,9 @@ export default function App() {
                 }
                 .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
                  @keyframes super-saiyan {
-                     0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
-                     50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
-                 }
+                    0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
+                    50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
+                }
                 .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; }
                 @keyframes legendary {
                     0%, 100% { text-shadow: 0 0 12px #00ffff, 0 0 22px #00ffff, 0 0 32px #ffffff; transform: scale(1.05); }
