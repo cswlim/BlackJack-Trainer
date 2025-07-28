@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 // --- HELPER FUNCTIONS & DATA ---
 
-// Basic Strategy Chart based on provided image.
+// Basic Strategy Chart for Dealer Stands on All 17s (S17)
 // Returns the optimal move: 'H' (Hit), 'S' (Stand), 'D' (Double), 'P' (Split)
 const getBasicStrategy = (playerHand, dealerUpCard) => {
     const handValue = card => {
@@ -30,57 +30,65 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
     const dealerValue = handValue(dealerUpCard);
     const canDouble = playerHand.length === 2;
 
-    // PAIR SPLITTING LOGIC from the chart
+    // PAIR SPLITTING LOGIC (S17 Rules)
     if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
         const rank = playerHand[0].rank;
-        if (rank === 'A' || rank === '8') return 'P'; // Always split Aces and 8s
+        if (rank === 'A' || rank === '8') return 'P';
         if (rank === '9') {
-            if ([7, 10, 11].includes(dealerValue)) return 'S'; // Stand against 7, 10, A
-            return 'P'; // Split against 2-6, 8, 9
+            if ([7, 10, 11].includes(dealerValue)) return 'S';
+            return 'P';
         }
         if (rank === '7') {
-            if (dealerValue <= 7) return 'P'; // Split against 2-7
-            return 'H'; // Hit against 8, 9, 10, A
+            if (dealerValue <= 7) return 'P';
+            return 'H';
         }
         if (rank === '6') {
-            if (dealerValue <= 6) return 'P'; // Split against 2-6
-            return 'H'; // Hit against 7-A
+            if (dealerValue <= 6) return 'P';
+            return 'H';
         }
-        if (rank === '5') { // This is treated as a hard 10
+        if (rank === '5') {
             if (dealerValue <= 9) return canDouble ? 'D' : 'H';
             return 'H';
         }
         if (rank === '4') {
-            if ([5, 6].includes(dealerValue)) return 'P'; // Split against 5, 6
-            return 'H'; // Hit against others
+            if ([5, 6].includes(dealerValue)) return 'P';
+            return 'H';
         }
-        if (rank === '3' || rank === '2') {
-            if (dealerValue <= 7) return 'P'; // Split against 2-7
-            return 'H'; // Hit against 8-A
+        if (rank === '2' || rank === '3') {
+            if (dealerValue <= 7) return 'P';
+            return 'H';
         }
-        if (['10', 'J', 'Q', 'K'].includes(rank)) return 'S'; // Never split 10s
+        if (['10', 'J', 'Q', 'K'].includes(rank)) return 'S';
     }
 
-    // SOFT HANDS LOGIC from the chart
+    // SOFT HANDS LOGIC (S17 Rules)
     if (player.isSoft) {
         const softTotal = player.score;
-        if (softTotal >= 19) return 'S'; // A-8, A-9, A-10 always stand
-        if (softTotal === 18) { // A-7
-            if (dealerValue >= 9) return 'H'; // Hit against 9, 10, A
-            return 'S'; // Stand against 2-8
+        if (softTotal >= 20) return 'S'; // A,9
+        if (softTotal === 19) { // A,8
+            if (dealerValue === 6) return canDouble ? 'D' : 'S';
+            return 'S';
         }
-        if (softTotal === 17) return 'H'; // A-6 always hits
-        if (softTotal === 16 || softTotal === 15) { // A-5, A-4
-             if ([4,5,6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-             return 'H';
+        if (softTotal === 18) { // A,7
+            if (dealerValue <= 6) return canDouble ? 'D' : 'S';
+            if (dealerValue <= 8) return 'S';
+            return 'H';
         }
-        if (softTotal === 14 || softTotal === 13) { // A-3, A-2
-             if ([5,6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-             return 'H';
+        if (softTotal === 17) { // A,6
+            if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
+            return 'H';
+        }
+        if (softTotal === 16 || softTotal === 15) { // A,5 or A,4
+            if (dealerValue >= 4 && dealerValue <= 6) return canDouble ? 'D' : 'H';
+            return 'H';
+        }
+        if (softTotal === 14 || softTotal === 13) { // A,3 or A,2
+            if (dealerValue >= 5 && dealerValue <= 6) return canDouble ? 'D' : 'H';
+            return 'H';
         }
     }
 
-    // HARD HANDS LOGIC from the chart
+    // HARD HANDS LOGIC (S17 Rules)
     const hardTotal = player.score;
     if (hardTotal >= 17) return 'S';
     if (hardTotal >= 13 && hardTotal <= 16) {
@@ -91,7 +99,10 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         if ([4, 5, 6].includes(dealerValue)) return 'S';
         return 'H';
     }
-    if (hardTotal === 11) return canDouble ? 'D' : 'H';
+    if (hardTotal === 11) {
+        if (dealerValue === 11) return 'H'; // Player 11 vs Dealer Ace is now HIT
+        return canDouble ? 'D' : 'H';
+    }
     if (hardTotal === 10) {
         if (dealerValue <= 9) return canDouble ? 'D' : 'H';
         return 'H';
@@ -100,7 +111,6 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
         return 'H';
     }
-    // 5-8
     return 'H';
 };
 
@@ -202,8 +212,16 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
 const StreakCounter = ({ streak }) => {
     if (streak < 2) return null;
 
+    const getStreakClass = () => {
+        if (streak >= 100) return 'text-orange-400 animate-super-saiyan';
+        if (streak >= 50) return 'text-red-400 animate-pulse-fast';
+        if (streak >= 25) return 'text-yellow-400 animate-glow-strong';
+        if (streak >= 10) return 'text-yellow-300 animate-glow';
+        return 'text-white';
+    };
+
     return (
-        <div className="bg-orange-500 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2">
+        <div className={`mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 ${getStreakClass()}`}>
             <span className="text-2xl">🔥</span>
             <span className="text-xl font-bold">{streak} Streak!</span>
         </div>
@@ -343,7 +361,7 @@ export default function App() {
         endOfRoundMessageSet.current = false;
         lastActionFeedback.current = '';
 
-        if (isCutCardRevealed) {
+        if (isCutCardRevealed || (gameMode === 'solo' && gameState !== 'pre-game')) {
             createShoe();
             setTimeout(() => setGameState('pre-deal'), 100);
             return;
@@ -654,7 +672,7 @@ export default function App() {
             setDealerHand(currentDealerHand => {
                 const scoreInfo = calculateScore(currentDealerHand.cards);
                 
-                if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
+                if (scoreInfo.score < 17) {
                     dealCard(card => {
                         if (card) {
                             // Use timeout to create a delay for the next draw
@@ -937,6 +955,26 @@ export default function App() {
                     to { opacity: 1; }
                 }
                 .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+                @keyframes glow {
+                    0%, 100% { text-shadow: 0 0 5px currentColor; }
+                    50% { text-shadow: 0 0 10px currentColor; }
+                }
+                .animate-glow { animation: glow 2s ease-in-out infinite; }
+                @keyframes glow-strong {
+                    0%, 100% { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+                    50% { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+                }
+                .animate-glow-strong { animation: glow-strong 1.5s ease-in-out infinite; }
+                @keyframes pulse-fast {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
+                 @keyframes super-saiyan {
+                    0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
+                    50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
+                }
+                .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; }
             `}</style>
         </div>
     );
