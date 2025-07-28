@@ -14,77 +14,106 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         let score = 0;
         let aceCount = 0;
         hand.forEach(card => {
-            if (card.rank === 'A') aceCount++;
-            score += handValue(card);
+            if (!card) return;
+            if (card.rank === 'A') {
+                aceCount++;
+            } else if (['J', 'Q', 'K'].includes(card.rank)) {
+                score += 10;
+            } else {
+                score += parseInt(card.rank);
+            }
         });
-        while (score > 21 && aceCount > 0) {
-            score -= 10;
-            aceCount--;
+
+        if (aceCount === 0) {
+            return { score: score, isSoft: false, display: `${score}` };
         }
-        return { score, isSoft: aceCount > 0 && (score - 10) < 11 };
+
+        const lowScore = score + aceCount;
+        const highScore = lowScore + 10;
+        
+        if (highScore === 21 && hand.length === 2) {
+            return { score: 21, isSoft: false, display: 'Blackjack' };
+        }
+
+        if (highScore > 21) {
+            return { score: lowScore, isSoft: false, display: `${lowScore}` };
+        } else {
+            return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
+        }
     };
 
     const player = calculateScore(playerHand);
     const dealerValue = handValue(dealerUpCard);
     const canDouble = playerHand.length === 2;
 
+    // Strategy based on the provided chart (4/6/8 Decks, Dealer Stands on All 17s)
+    // H = Hit, S = Stand, D = Double, P = Split, R = Surrender (not implemented, default to H)
+
+    // Pairs
     if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
         const rank = playerHand[0].rank;
-        if (rank === 'A' || rank === '8') return 'P';
-        if (rank === '9') {
-            if ([7, 10, 11].includes(dealerValue)) return 'S';
-            return 'P';
+        switch (rank) {
+            case 'A': return 'P';
+            case '10': case 'J': case 'Q': case 'K': return 'S';
+            case '9':
+                if ([7, 10, 11].includes(dealerValue)) return 'S';
+                return 'P';
+            case '8': return 'P';
+            case '7':
+                if (dealerValue <= 7) return 'P';
+                return 'H';
+            case '6':
+                if (dealerValue <= 6) return 'P';
+                return 'H';
+            case '5':
+                if (dealerValue <= 9) return canDouble ? 'D' : 'H'; // Chart says D vs 2-9
+                return 'H';
+            case '4':
+                // Custom rule: 4,4 vs 4 is Hit, not Split (as per user request, overriding chart)
+                if (dealerValue === 4) return 'H';
+                if ([5, 6].includes(dealerValue)) return 'P'; // Chart says P vs 5,6
+                return 'H'; // All other 4,4 pairs are Hit
+            case '3': case '2':
+                if (dealerValue <= 7) return 'P';
+                return 'H';
+            default: return 'H'; // Should not happen
         }
-        if (rank === '7') {
-            if (dealerValue <= 7) return 'P';
-            return 'H';
-        }
-        if (rank === '6') {
-            if (dealerValue <= 6) return 'P';
-            return 'H';
-        }
-        if (rank === '5') {
-            if (dealerValue <= 9) return canDouble ? 'D' : 'H';
-            return 'H';
-        }
-        if (rank === '4') {
-            if ([5, 6].includes(dealerValue)) return 'P';
-            return 'H';
-        }
-        if (rank === '2' || rank === '3') {
-            if (dealerValue <= 7) return 'P';
-            return 'H';
-        }
-        if (['10', 'J', 'Q', 'K'].includes(rank)) return 'S';
     }
 
+    // Soft Totals
     if (player.isSoft) {
-        const softTotal = player.score;
-        if (softTotal >= 20) return 'S';
-        if (softTotal === 19) {
-            if (dealerValue === 6) return canDouble ? 'D' : 'S';
-            return 'S';
-        }
-        if (softTotal === 18) {
-            if (dealerValue <= 6) return canDouble ? 'D' : 'S';
-            if (dealerValue <= 8) return 'S';
-            return 'H';
-        }
-        if (softTotal === 17) {
-            if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
-            return 'H';
-        }
-        if (softTotal === 16 || softTotal === 15) {
-            if (dealerValue >= 4 && dealerValue <= 6) return canDouble ? 'D' : 'H';
-            return 'H';
-        }
-        if (softTotal === 14 || softTotal === 13) {
-            if (dealerValue >= 5 && dealerValue <= 6) return canDouble ? 'D' : 'H';
-            return 'H';
+        const softTotal = player.score; // This is the high score (e.g., A+7 = 18)
+        switch (softTotal) {
+            case 20: // A,9
+                return 'S';
+            case 19: // A,8
+                if (dealerValue === 6) return canDouble ? 'D' : 'S';
+                return 'S';
+            case 18: // A,7
+                if ([2, 3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'S';
+                if ([7, 8].includes(dealerValue)) return 'S';
+                return 'H';
+            case 17: // A,6
+                if ([3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 16: // A,5
+                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 15: // A,4
+                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 14: // A,3
+                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 13: // A,2
+                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            default: return 'H'; // Should not happen for soft totals < 13
         }
     }
 
-    const hardTotal = player.score;
+    // Hard Totals
+    const hardTotal = player.score; // This is the final score if not soft
     if (hardTotal >= 17) return 'S';
     if (hardTotal >= 13 && hardTotal <= 16) {
         if (dealerValue <= 6) return 'S';
@@ -95,7 +124,7 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         return 'H';
     }
     if (hardTotal === 11) {
-        if (dealerValue === 11) return 'H';
+        if (dealerValue === 11) return 'H'; // Chart says H vs A
         return canDouble ? 'D' : 'H';
     }
     if (hardTotal === 10) {
@@ -106,7 +135,10 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
         return 'H';
     }
-    return 'H';
+    // Hard totals 5-8 (chart says H for all)
+    if (hardTotal >= 5 && hardTotal <= 8) return 'H';
+
+    return 'H'; // Default catch-all, should be covered by above
 };
 
 const getCardCountValue = (card) => {
@@ -219,9 +251,218 @@ const StreakCounter = ({ streak }) => {
     };
 
     return (
-        <div className={`mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 ${getStreakClass()}`}>
+        <div className={`mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 ${getStreakClass()}`}>
             <span className="text-2xl">🔥</span>
             <span className="text-xl font-bold">{streak} Streak!</span>
+        </div>
+    );
+};
+
+const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
+    const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
+    // Hard totals from the provided chart, including 5-7 as a range
+    const hardTotals = ['5-7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
+    const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
+    const pairs = ['2,2', '3,3', '4,4', '5,5', '6,6', '7,7', '8,8', '9,9', '10,10', 'A,A'];
+
+    // Strategy data matching the provided image
+    const strategyData = {
+        hard: {
+            '17+': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            '16': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '15': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '14': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '13': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '12': ['H', 'H', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '11': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H'],
+            '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
+            '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+            '5-7': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+        },
+        soft: {
+            'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            'A,8': ['S', 'S', 'S', 'S', 'D', 'S', 'S', 'S', 'S', 'S'],
+            'A,7': ['D', 'D', 'D', 'D', 'D', 'S', 'S', 'H', 'H', 'H'],
+            'A,6': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,5': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,4': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,3': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,2': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+        },
+        pairs: {
+            'A,A': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            '10,10': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            '9,9': ['P', 'P', 'P', 'P', 'P', 'S', 'P', 'P', 'S', 'S'],
+            '8,8': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            '7,7': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            '6,6': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
+            '5,5': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
+            '4,4': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'], // Changed 4,4 vs 4 from P to H
+            '3,3': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            '2,2': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+        }
+    };
+
+    const getPlayerHandKeyForChart = useCallback((hand) => {
+        if (!hand || hand.length === 0) return null;
+        const { score, isSoft } = calculateScore(hand);
+        const ranks = hand.map(card => card.rank);
+
+        // Check for pairs first (only applies to 2 cards)
+        if (hand.length === 2 && ranks[0] === ranks[1]) {
+            return `${ranks[0]},${ranks[1]}`;
+        }
+        // Check for soft totals
+        if (isSoft) {
+            if (score >= 20) return 'A,9';
+            if (score === 19) return 'A,8';
+            if (score === 18) return 'A,7';
+            if (score === 17) return 'A,6';
+            if (score === 16) return 'A,5';
+            if (score === 15) return 'A,4';
+            if (score === 14) return 'A,3';
+            if (score === 13) return 'A,2';
+        }
+        // Hard totals
+        if (score >= 17) return '17+';
+        if (score >= 5 && score <= 7) return '5-7';
+        return `${score}`;
+    }, [calculateScore]);
+
+    const getDealerUpCardKeyForChart = useCallback((card) => {
+        if (!card) return null;
+        if (card.rank === 'A') return 'A';
+        return card.rank;
+    }, []);
+
+    const playerKey = getPlayerHandKeyForChart(playerHand);
+    const dealerKey = getDealerUpCardKeyForChart(dealerUpCard);
+
+    const getActionColorClass = (action) => {
+        switch (action) {
+            case 'H': return 'bg-green-700 text-white';   // Hit: Muted Green
+            case 'S': return 'bg-red-700 text-white';     // Stand: Muted Red
+            case 'D': return 'bg-orange-700 text-white';  // Double: Muted Orange/Gold
+            case 'P': return 'bg-blue-900 text-white';    // Split: Darker Blue (Navy)
+            default: return 'bg-gray-700 text-gray-100';  // Default or unknown
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
+                <button
+                    onClick={onClose}
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Basic Strategy Chart</h2>
+
+                <div className="space-y-6">
+                    {/* Hard Totals */}
+                    <div>
+                        <h3 className="text-lg font-semibold mb-2 text-yellow-300">Hard Totals</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {hardTotals.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.hard[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Soft Totals */}
+                    <div>
+                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Soft Totals</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {softTotals.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.soft[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pairs */}
+                    <div>
+                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Pairs</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pairs.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.pairs[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
@@ -265,6 +506,7 @@ export default function App() {
     const [isActionDisabled, setIsActionDisabled] = useState(false);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
+    const [showChartModal, setShowChartModal] = useState(false); // State for chart modal
 
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
@@ -434,7 +676,7 @@ export default function App() {
         
         // Update feedback message
         if (isCorrect) {
-            setFeedback('✔'); // Use the heavy check mark emoji
+            setFeedback('✔️'); // Use the heavy check mark emoji
             setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
@@ -811,6 +1053,21 @@ export default function App() {
         }
     };
 
+    const activePlayerHand = useMemo(() => {
+        if (gameMode === 'solo' && playerHands.length > activeHandIndex) {
+            return playerHands[activeHandIndex].cards;
+        }
+        if (gameMode === 'counting' && playerSeat !== null && tableHands.length > playerSeat) {
+            return tableHands[playerSeat].cards;
+        }
+        return [];
+    }, [gameMode, playerHands, activeHandIndex, playerSeat, tableHands]);
+
+    const dealerUpCard = useMemo(() => {
+        return dealerHand.cards.find(card => !card.isHidden);
+    }, [dealerHand.cards]);
+
+
     if (!gameMode) {
         return (
             <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-900`}>
@@ -832,6 +1089,16 @@ export default function App() {
                         <div className="flex items-center gap-6">
                             <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
                         </div>
+                        {/* Basic Strategy Chart Icon */}
+                        <button
+                            onClick={() => setShowChartModal(true)}
+                            className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
+                            title="View Basic Strategy Chart"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
                     </header>
 
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
@@ -843,7 +1110,7 @@ export default function App() {
                         </div>
 
                         {/* Central Deal Button / Feedback Message */}
-                        <div className="text-center my-0 h-10 flex items-center justify-center"> {/* Adjusted height and removed vertical margin */}
+                        <div className="text-center my-0 h-10 flex items-center justify-center">
                             {(gameState === 'pre-deal' || gameState === 'pre-game') && (
                                 <button 
                                     onClick={dealNewGame} 
@@ -854,7 +1121,7 @@ export default function App() {
                             )}
                             {/* Concise feedback message */}
                             {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
-                                <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}> {/* Changed text-3xl to text-2xl */}
+                                <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
                                     {feedback}
                                 </p>
                             )}
@@ -865,11 +1132,11 @@ export default function App() {
                                 <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <div className="font-bold text-xl text-center h-8 flex flex-col justify-center"> {/* Changed h-14 to h-8 and added flex for vertical centering */}
+                                            <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
                                                 <div className="flex justify-center items-center gap-2">
                                                     <span>
                                                         {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
-                                                        {hand.display}
+                                                        {hand.status === 'bust' ? 'Bust' : hand.display}
                                                     </span>
                                                     {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
                                                         <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
@@ -877,10 +1144,6 @@ export default function App() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                {/* Only display 'bust' status */}
-                                                {hand.status === 'bust' && (
-                                                    <p className="text-base text-red-400 capitalize">Bust</p>
-                                                )}
                                             </div>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
@@ -906,11 +1169,8 @@ export default function App() {
                                     <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
                                         {tableHands.map((hand, i) => (
                                             <div key={i} className={`relative p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex && gameState === 'ai-turn' ? 'ring-2 ring-blue-400' : ''}`}>
-                                                <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">{i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.display}
-                                                    {/* Only display 'bust' status */}
-                                                    {hand.status === 'bust' && (
-                                                        <p className="text-base text-red-400 capitalize">Bust</p>
-                                                    )}
+                                                <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">
+                                                    {i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.status === 'bust' ? 'Bust' : hand.display}
                                                 </h3>
                                                 <div className="flex justify-center items-center -space-x-12 mt-1 min-h-[120px] scale-75">
                                                     {hand.cards.map((card, j) => <Card key={j} {...card} />)}
@@ -961,6 +1221,14 @@ export default function App() {
                 </div>
             </div>
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
+            {showChartModal && (
+                <BasicStrategyChartModal 
+                    playerHand={activePlayerHand} 
+                    dealerUpCard={dealerUpCard} 
+                    onClose={() => setShowChartModal(false)}
+                    calculateScore={calculateScore} // Pass calculateScore to the modal
+                />
+            )}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                 body {
