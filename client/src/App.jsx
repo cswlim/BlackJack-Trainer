@@ -670,7 +670,7 @@ export default function App() {
         
         // Update feedback message
         if (isCorrect) {
-            setFeedback('✔️'); // Use the heavy check mark emoji
+            setFeedback('✅'); // Use the heavy check mark emoji
             setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
