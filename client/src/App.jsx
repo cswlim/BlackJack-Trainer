@@ -309,11 +309,12 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
         const { score, isSoft } = calculateScore(hand);
         const ranks = hand.map(card => card.rank);
 
-        // Check for pairs first (only applies to 2 cards)
+        // Handle pairs (normalize J,Q,K to 10)
         if (hand.length === 2 && ranks[0] === ranks[1]) {
-            return `${ranks[0]},${ranks[1]}`;
+            const normalizedRank = ['J', 'Q', 'K'].includes(ranks[0]) ? '10' : ranks[0];
+            return `${normalizedRank},${normalizedRank}`;
         }
-        // Check for soft totals
+        // Handle soft totals
         if (isSoft) {
             if (score >= 20) return 'A,9';
             if (score === 19) return 'A,8';
@@ -324,7 +325,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             if (score === 14) return 'A,3';
             if (score === 13) return 'A,2';
         }
-        // Hard totals
+        // Handle hard totals
         if (score >= 17) return '17+';
         if (score >= 5 && score <= 7) return '5-7';
         return `${score}`;
@@ -332,6 +333,8 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
 
     const getDealerUpCardKeyForChart = useCallback((card) => {
         if (!card) return null;
+        // Normalize J,Q,K to 10 for dealer's up-card
+        if (['J', 'Q', 'K'].includes(card.rank)) return '10';
         if (card.rank === 'A') return 'A';
         return card.rank;
     }, []);
@@ -351,7 +354,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-sm md:max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
                 <button
                     onClick={onClose}
                     className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
@@ -371,7 +374,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[8%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -404,7 +407,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[8%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -437,7 +440,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[8%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -628,15 +631,8 @@ export default function App() {
                 const dealCountingTable = () => {
                     if (cardsToDealCount > 0) {
                         dealCard(card => {
-                            if (cardsToDealCount > 8) {
-                                tempTableHands[15 - cardsToDealCount].cards.push(card);
-                            } else if (cardsToDealCount === 8) {
-                                tempDealerHand.push(card);
-                            } else {
-                                tempTableHands[7 - cardsToDealCount].cards.push(card);
-                            }
-                            
-                            cardsToDealCount--;
+                            cardsToDeal.push(card);
+                            dealtCount++;
                             dealCountingTable();
                         });
                     } else {
@@ -676,7 +672,7 @@ export default function App() {
         
         // Update feedback message
         if (isCorrect) {
-            setFeedback('✔️'); // Use the heavy check mark emoji
+            setFeedback('✅'); // Use the heavy check mark emoji
             setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
