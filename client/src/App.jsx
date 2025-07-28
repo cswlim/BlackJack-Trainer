@@ -207,6 +207,7 @@ const StreakCounter = ({ streak }) => {
 
     const getStreakClass = () => {
         if (streak >= 100) return 'text-orange-400 animate-super-saiyan';
+        if (streak >= 75) return 'text-cyan-400 animate-legendary';
         if (streak >= 50) return 'text-red-400 animate-pulse-fast';
         if (streak >= 25) return 'text-yellow-400 animate-glow-strong';
         if (streak >= 10) return 'text-yellow-300 animate-glow';
@@ -314,9 +315,6 @@ export default function App() {
         if (highScore > 21) {
             return { score: lowScore, isSoft: false, display: `${lowScore}` };
         } else {
-            if (highScore >= 18) {
-                 return { score: highScore, isSoft: true, display: `${highScore}` };
-            }
             return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
         }
     }, []);
@@ -954,6 +952,11 @@ export default function App() {
                      50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
                  }
                 .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; }
+                @keyframes legendary {
+                    0%, 100% { text-shadow: 0 0 12px #00ffff, 0 0 22px #00ffff, 0 0 32px #ffffff; transform: scale(1.05); }
+                    50% { text-shadow: 0 0 22px #00ffff, 0 0 32px #ffffff, 0 0 42px #00aaff; transform: scale(1.1); }
+                }
+                .animate-legendary { animation: legendary 1.2s ease-in-out infinite; }
             `}</style>
         </div>
     );
