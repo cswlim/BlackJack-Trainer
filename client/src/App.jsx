@@ -206,6 +206,10 @@ const StreakCounter = ({ streak }) => {
     if (streak < 2) return null;
 
     const getStreakClass = () => {
+        if (streak >= 300) return 'animate-god-tier text-white';
+        if (streak >= 250) return 'animate-mythic text-yellow-300';
+        if (streak >= 200) return 'animate-grandmaster text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500';
+        if (streak >= 150) return 'animate-mastery text-gray-200';
         if (streak >= 100) return 'text-orange-400 animate-super-saiyan';
         if (streak >= 75) return 'text-cyan-400 animate-legendary';
         if (streak >= 50) return 'text-red-400 animate-pulse-fast';
@@ -957,6 +961,30 @@ export default function App() {
                     50% { text-shadow: 0 0 22px #00ffff, 0 0 32px #ffffff, 0 0 42px #00aaff; transform: scale(1.1); }
                 }
                 .animate-legendary { animation: legendary 1.2s ease-in-out infinite; }
+                @keyframes mastery {
+                    0%, 100% { text-shadow: 0 0 10px #ffffff, 0 0 15px #ffffff; }
+                    50% { text-shadow: 0 0 15px #ffffff, 0 0 25px #dddddd; }
+                }
+                .animate-mastery { animation: mastery 1.5s ease-in-out infinite; }
+                @keyframes grandmaster {
+                    0%, 100% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                }
+                .animate-grandmaster {
+                    background-size: 200% 200%;
+                    animation: grandmaster 3s ease-in-out infinite;
+                }
+                @keyframes mythic {
+                    0%, 100% { text-shadow: 0 0 10px #ffc300, 0 0 20px #ff5733, 0 0 30px #c70039, 0 0 40px #900c3f; }
+                    50% { text-shadow: 0 0 15px #ffc300, 0 0 25px #ff5733, 0 0 35px #c70039, 0 0 50px #900c3f; transform: scale(1.02); }
+                }
+                .animate-mythic { animation: mythic 1s ease-in-out infinite; }
+                @keyframes god-tier {
+                    0% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
+                    50% { text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6, 0 0 60px #ff4da6, 0 0 70px #ff4da6, 0 0 80px #ff4da6; }
+                    100% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
+                }
+                .animate-god-tier { animation: god-tier 2s linear infinite; }
             `}</style>
         </div>
     );
