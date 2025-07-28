@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 // --- HELPER FUNCTIONS & DATA ---
 
-// Basic Strategy Chart for Dealer Stands on All 17s (S17)
-// Returns the optimal move: 'H' (Hit), 'S' (Stand), 'D' (Double), 'P' (Split)
 const getBasicStrategy = (playerHand, dealerUpCard) => {
     const handValue = card => {
         if (!card) return 0;
@@ -30,7 +28,6 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
     const dealerValue = handValue(dealerUpCard);
     const canDouble = playerHand.length === 2;
 
-    // PAIR SPLITTING LOGIC (S17 Rules)
     if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
         const rank = playerHand[0].rank;
         if (rank === 'A' || rank === '8') return 'P';
@@ -61,34 +58,32 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         if (['10', 'J', 'Q', 'K'].includes(rank)) return 'S';
     }
 
-    // SOFT HANDS LOGIC (S17 Rules)
     if (player.isSoft) {
         const softTotal = player.score;
-        if (softTotal >= 20) return 'S'; // A,9
-        if (softTotal === 19) { // A,8
+        if (softTotal >= 20) return 'S';
+        if (softTotal === 19) {
             if (dealerValue === 6) return canDouble ? 'D' : 'S';
             return 'S';
         }
-        if (softTotal === 18) { // A,7
+        if (softTotal === 18) {
             if (dealerValue <= 6) return canDouble ? 'D' : 'S';
             if (dealerValue <= 8) return 'S';
             return 'H';
         }
-        if (softTotal === 17) { // A,6
+        if (softTotal === 17) {
             if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
             return 'H';
         }
-        if (softTotal === 16 || softTotal === 15) { // A,5 or A,4
+        if (softTotal === 16 || softTotal === 15) {
             if (dealerValue >= 4 && dealerValue <= 6) return canDouble ? 'D' : 'H';
             return 'H';
         }
-        if (softTotal === 14 || softTotal === 13) { // A,3 or A,2
+        if (softTotal === 14 || softTotal === 13) {
             if (dealerValue >= 5 && dealerValue <= 6) return canDouble ? 'D' : 'H';
             return 'H';
         }
     }
 
-    // HARD HANDS LOGIC (S17 Rules)
     const hardTotal = player.score;
     if (hardTotal >= 17) return 'S';
     if (hardTotal >= 13 && hardTotal <= 16) {
@@ -114,8 +109,6 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
     return 'H';
 };
 
-
-// Hi-Lo Card Counting Value
 const getCardCountValue = (card) => {
     const rank = card.rank;
     if (['2', '3', '4', '5', '6'].includes(rank)) return 1;
@@ -232,23 +225,19 @@ const StreakCounter = ({ streak }) => {
 // --- MAIN APP COMPONENT ---
 
 export default function App() {
-    // Game settings
-    const [gameMode, setGameMode] = useState(null); // 'solo', 'counting'
+    const [gameMode, setGameMode] = useState(null);
     const NUM_DECKS = 6;
 
-    // Game state
     const [deck, setDeck] = useState([]);
     const [cutCardPosition, setCutCardPosition] = useState(0);
     const [isCutCardRevealed, setIsCutCardRevealed] = useState(false);
     const [showCutCardOnTable, setShowCutCardOnTable] = useState(false);
-    const [gameState, setGameState] = useState('pre-game'); // 'pre-game', 'pre-deal', 'player-turn', 'dealer-turn', 'end'
+    const [gameState, setGameState] = useState('pre-game');
     
-    // Player & Dealer state
     const [playerHands, setPlayerHands] = useState([]);
     const [activeHandIndex, setActiveHandIndex] = useState(0);
     const [dealerHand, setDealerHand] = useState({ cards: [] });
     
-    // Counting mode state
     const [tableHands, setTableHands] = useState(Array.from({ length: 7 }, () => ({ cards: [], score: 0, display: '0', status: 'playing' })));
     const [playerSeat, setPlayerSeat] = useState(null);
     const [runningCount, setRunningCount] = useState(0);
@@ -256,7 +245,6 @@ export default function App() {
     const [activeTableHandIndex, setActiveTableHandIndex] = useState(0);
     const [pendingPlayerAction, setPendingPlayerAction] = useState(null);
 
-    // UI state
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
     const [history, setHistory] = useState([]);
@@ -272,7 +260,6 @@ export default function App() {
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
 
-    // --- DECK & SHOE LOGIC ---
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
         const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -299,7 +286,6 @@ export default function App() {
         setShowCutCardOnTable(false);
     }, []);
 
-    // --- HAND SCORE CALCULATION ---
     const calculateScore = useCallback((hand) => {
         let scoreWithoutAces = 0;
         let aceCount = 0;
@@ -335,7 +321,6 @@ export default function App() {
         }
     }, []);
 
-    // --- ATOMIC CARD DEALING ---
     const dealCard = useCallback((callback) => {
         setDeck(prevDeck => {
             if (prevDeck.length === 0) {
@@ -389,7 +374,7 @@ export default function App() {
                     }
                 };
                 dealInitialSolo();
-            } else { // Counting Mode
+            } else {
                 let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
                 let tempDealerHand = [];
                 let cardsToDealCount = 15;
@@ -431,7 +416,6 @@ export default function App() {
         }
     }, [isCutCardRevealed, gameMode, createShoe, calculateScore, dealCard]);
     
-    // Player Actions
     const executePlayerAction = useCallback((actionCode, actionName) => {
         setIsActionDisabled(true);
         const hands = gameMode === 'solo' ? playerHands : tableHands;
@@ -534,12 +518,9 @@ export default function App() {
         if (!hands[index]) return false;
         return hands[index].cards.length === 2;
     }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
-
-    // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
     useEffect(() => {
         if (gameState !== 'player-turn') return;
-
         const activeHand = playerHands[activeHandIndex];
         if (activeHand && activeHand.cards.length === 1) {
             setTimeout(() => {
@@ -559,7 +540,6 @@ export default function App() {
             }, 500);
         }
     }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard]);
-
 
     useEffect(() => {
         if (gameState !== 'player-turn') {
@@ -783,8 +763,6 @@ export default function App() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
 
-
-    // --- RENDER LOGIC ---
     const selectMode = (mode) => {
         setGameMode(mode);
         createShoe();
@@ -855,14 +833,15 @@ export default function App() {
                         </div>
 
                         <div className="text-center my-1 h-16 flex items-center justify-center">
-                            {(gameState === 'pre-deal' || gameState === 'end') ? (
+                            {(gameState === 'pre-deal' || gameState === 'end') && (
                                 <button 
                                     onClick={dealNewGame} 
                                     className="bg-blue-500 text-white font-semibold px-8 py-4 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400 text-xl"
                                 >
                                     Deal
                                 </button>
-                            ) : (
+                            )}
+                            {(feedback || message) && gameState !== 'pre-deal' && gameState !== 'end' && (
                                 <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
                                     {feedback || message}
                                 </p>
@@ -903,7 +882,7 @@ export default function App() {
                     </div>
                     
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H', 'a'], ['Stand', 'S', 's'], ['Double', 'D', 'd'], ['Split', 'P', 'f']].map(([actionName, actionCode, ...keys]) => (
+                         {[['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']].map(([actionName, actionCode]) => (
                              <button
                                  key={actionName}
                                  onClick={() => handlePlayerAction(actionCode, actionName)}
@@ -914,10 +893,7 @@ export default function App() {
                                      ${actionCode === 'D' && 'bg-orange-400 text-white'}
                                      ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
                              >
-                                 <div className="flex flex-col text-center">
-                                     <span>{actionName}</span>
-                                     <span className="text-xs font-mono opacity-70">({keys.join('/')})</span>
-                                 </div>
+                                 {actionName}
                              </button>
                          ))}
                     </div>
