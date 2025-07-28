@@ -1095,10 +1095,10 @@ export default function App() {
                         </button>
                     </header>
 
-                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]"> {/* Increased min-h */}
+                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
                         <div className="text-center mb-2">
                             <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
-                            <div className="flex justify-center items-center space-x-2 flex-wrap"> {/* Added flex-wrap */}
+                            <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap"> {/* Adjusted gap and added flex-wrap */}
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
                         </div>
@@ -1139,7 +1139,7 @@ export default function App() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2"> {/* Removed min-h, cards will dictate height */}
+                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
                                             {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
@@ -1166,7 +1166,7 @@ export default function App() {
                                                 <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">
                                                     {i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.status === 'bust' ? 'Bust' : hand.display}
                                                 </h3>
-                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1"> {/* Removed min-h, cards will dictate height */}
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1">
                                                     {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                                 </div>
                                                 {/* Transparent Deal Button for Counting Mode (only on player's seat) - Active only at end of round */}
