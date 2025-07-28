@@ -159,17 +159,18 @@ const CountPromptModal = ({ onConfirm, onCancel }) => {
     );
 };
 
-const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, playerBjCount, dealerBjCount }) => {
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount }) => {
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
-        <div className="w-full md:w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 mt-4 md:mt-0 md:fixed md:top-4 md:right-4">
+        <div className="w-full md:w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 mt-4 md:mt-0 md:fixed md:top-4 md:right-4 group">
             <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
                 <h3 className="text-lg font-bold">History</h3>
                 <div className="flex flex-col items-end text-sm space-y-1">
                     <div className="flex gap-3">
                         <span className="text-blue-400">W: {winCount}</span>
                         <span className="text-orange-400">L: {lossCount}</span>
+                        <span className="text-gray-400">P: {pushCount}</span>
                     </div>
                     <div className="flex gap-3">
                         <span className="text-green-400">✅ {correctCount}</span>
@@ -181,9 +182,9 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
                     </div>
                 </div>
             </div>
-            <ul className="space-y-2">
-                {history.slice(0, 5).map((item, index) => (
-                    <li key={index} className={`text-sm transition-opacity duration-300 ${opacities[index] || 'opacity-0'}`}>
+            <ul className="space-y-2 max-h-28 overflow-hidden transition-all duration-300 group-hover:max-h-96 group-hover:overflow-y-auto">
+                {history.slice(0, 25).map((item, index) => (
+                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-25'}`}>
                         {item.isResult ? (
                             <span className="font-bold text-yellow-300">{item.text}</span>
                         ) : (
@@ -243,6 +244,7 @@ export default function App() {
     const [incorrectCount, setIncorrectCount] = useState(0);
     const [winCount, setWinCount] = useState(0);
     const [lossCount, setLossCount] = useState(0);
+    const [pushCount, setPushCount] = useState(0);
     const [playerBjCount, setPlayerBjCount] = useState(0);
     const [dealerBjCount, setDealerBjCount] = useState(0);
     const lastActionFeedback = useRef('');
@@ -339,6 +341,7 @@ export default function App() {
             setIncorrectCount(0);
             setWinCount(0);
             setLossCount(0);
+            setPushCount(0);
             setPlayerBjCount(0);
             setDealerBjCount(0);
             setTimeout(() => setGameState('pre-deal'), 100);
@@ -491,6 +494,21 @@ export default function App() {
             executePlayerAction(actionCode, actionName);
         }
     }, [gameMode, executePlayerAction]);
+
+    const canSplit = useMemo(() => {
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
+        if (!hands[index]) return false;
+        const cards = hands[index].cards;
+        return cards.length === 2 && cards[0].rank === cards[1].rank;
+    }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
+
+    const canDouble = useMemo(() => {
+        const hands = gameMode === 'solo' ? playerHands : tableHands;
+        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
+        if (!hands[index]) return false;
+        return hands[index].cards.length === 2;
+    }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
@@ -671,6 +689,7 @@ export default function App() {
             let resultMessage = '';
             let handWins = 0;
             let handLosses = 0;
+            let pushes = 0;
 
             if (playerHasBj && !dealerHasBj) {
                 resultMessage = 'Blackjack! You win.';
@@ -682,6 +701,7 @@ export default function App() {
                 setDealerBjCount(prev => prev + 1);
             } else if (dealerHasBj && playerHasBj) {
                 resultMessage = 'Push (Both have Blackjack).';
+                pushes++;
             } else {
                  handsToEvaluate.forEach((hand, index) => {
                     resultMessage += `Hand ${index + 1}: `;
@@ -699,11 +719,13 @@ export default function App() {
                         handLosses++;
                     } else {
                         resultMessage += 'Push. ';
+                        pushes++;
                     }
                 });
 
                 if (handWins > handLosses) setWinCount(prev => prev + 1);
                 else if (handLosses > handWins) setLossCount(prev => prev + 1);
+                else if (pushes > 0) setPushCount(prev => prev + pushes);
             }
             
             setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
@@ -720,7 +742,7 @@ export default function App() {
     useEffect(() => {
         let timerId;
         if (gameState === 'end' && autoDeal) {
-            timerId = setTimeout(() => dealCallback.current(), 2500);
+            timerId = setTimeout(() => dealCallback.current(), 1500);
         }
         return () => {
             if (timerId) clearTimeout(timerId);
@@ -767,6 +789,7 @@ export default function App() {
         setIncorrectCount(0);
         setWinCount(0);
         setLossCount(0);
+        setPushCount(0);
         setPlayerBjCount(0);
         setDealerBjCount(0);
         if (mode === 'solo') {
@@ -794,21 +817,6 @@ export default function App() {
             setPendingPlayerAction(null);
         }
     };
-
-    const canSplit = useMemo(() => {
-        const hands = gameMode === 'solo' ? playerHands : tableHands;
-        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
-        if (!hands[index]) return false;
-        const cards = hands[index].cards;
-        return cards.length === 2 && cards[0].rank === cards[1].rank;
-    }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
-
-    const canDouble = useMemo(() => {
-        const hands = gameMode === 'solo' ? playerHands : tableHands;
-        const index = gameMode === 'solo' ? activeHandIndex : playerSeat;
-        if (!hands[index]) return false;
-        return hands[index].cards.length === 2;
-    }, [playerHands, tableHands, activeHandIndex, playerSeat, gameMode]);
 
     if (!gameMode) {
         return (
@@ -917,7 +925,7 @@ export default function App() {
                          ))}
                     </div>
                 </div>
-                {gameMode === 'solo' && <div className="w-full md:w-64"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} /></div>}
+                {gameMode === 'solo' && <div className="w-full md:w-64"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} /></div>}
             </div>
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <style>{`
