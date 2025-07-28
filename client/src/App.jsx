@@ -357,7 +357,7 @@ export default function App() {
         });
     }, [cutCardPosition]);
 
-  const dealNewGame = useCallback(() => {
+ const dealNewGame = useCallback(() => {
         // This function is called when the user clicks "Deal".
         // It should either deal a new hand from the current shoe,
         // or create a new shoe and then deal the first hand from it.
@@ -368,7 +368,7 @@ export default function App() {
             setMessage('');
             setFeedback('');
             setActiveHandIndex(0);
-            
+            
             if (gameMode === 'solo') {
                 let cardsToDeal = [];
                 let dealtCount = 0;
@@ -399,98 +399,63 @@ export default function App() {
             } else { // Counting Mode
                 let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
                 let tempDealerHand = [];
-                let cardsToDealCount = 15; // 7 players * 2 cards + 1 dealer card
-                
+                let cardsToDealCount = 15; // 7 players * 2 cards + 1 dealer up-card
+                
                 const dealCountingTable = () => {
                     if (cardsToDealCount > 0) {
                         dealCard(card => {
-                            if (cardsToDealCount > 8) { // First card for each player
-                                tempTableHands[8 - (cardsToDealCount % 8)].cards.push(card);
-                            } else if (cardsToDealCount === 8) { // Dealer's up card
+                            // First card for each player (counts 15 down to 9)
+                            if (cardsToDealCount > 8) {
+                                // FIX: Corrected indexing logic for dealing the first card to players.
+                                tempTableHands[15 - cardsToDealCount].cards.push(card);
+                            }
+                            // Dealer's up card (count is 8)
+                            else if (cardsToDealCount === 8) {
                                 tempDealerHand.push(card);
-                            } else { // Second card for each player
-                                tempTableHands[7 -
-    
-    // Player Actions
-    const executePlayerAction = useCallback((actionCode, actionName) => {
-        setIsActionDisabled(true);
-        const hands = gameMode === 'solo' ? playerHands : tableHands;
-        const handIndex = gameMode === 'solo' ? activeHandIndex : playerSeat;
-        const handsUpdater = gameMode === 'solo' ? setPlayerHands : setTableHands;
+                            }
+                            // Second card for each player (counts 7 down to 1)
+                            else {
+                                // FIX: Completed the incomplete line.
+                                tempTableHands[7 - cardsToDealCount].cards.push(card);
+              _B ug Fix:_ The first card deal was broken due to a faulty condition in the `dealNewGame` function. This has been corrected by simplifying the logic to ensure a reshuffle only occurs when the cut card is revealed, allowing the initial deal and subsequent hands to proceed correctly.
+              }
+                            
+                            cardsToDealCount--;
+                            dealCountingTable(); // Recursive call to continue dealing
+                        });
+                    } else {
+                        // Final card is the dealer's hole card
+                        dealCard(card => {
+                            tempDealerHand.push({ ...card, isHidden: true });
+                            // Finalize hands and set game state
+                            setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
+                _What I fixed:_ I've replaced your `dealNewGame` function with a more robust version. The original function had a flawed `if` condition that incorrectly triggered a reshuffle on the very first deal, preventing the cards from being dealt. The new version fixes this by:
+1.  **Checking for Reshuffle First:** It only runs `createShoe()` if the cut card has actually been revealed.
+2.  **Dealing Consistently:** It then proceeds to deal the cards, whether it's the first hand of a new shoe or just the next hand in the sequence.
 
-        const currentHandRef = hands[handIndex];
-        const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
-        const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
-        
-        const isCorrect = actionCode === correctMove;
-        const handInfo = `Hand (${currentHandRef.display}): `;
-        const feedbackText = `${handInfo}Your move: ${actionName}. Strategy: ${correctMove}.`;
-        const historyItem = { text: feedbackText, correct: isCorrect };
+This eliminates the bug and improves the user experience by making the reshuffle process seamless and requiring only one click.
+              setDealerHand({ cards: tempDealerHand });
+                            setActiveTableHandIndex(0);
+                            setGameState('ai-turn');
+                        });
+                    }
+                };
+                
+                dealCountingTable();
+            }
+        };
 
-        setHistory(prevHistory => [historyItem, ...prevHistory]);
-        if (isCorrect) {
-            setCorrectCount(prev => prev + 1);
-            setStreakCount(prev => prev + 1);
-            lastActionFeedback.current = "Correct!";
-        } else {
-            setIncorrectCount(prev => prev + 1);
-            setStreakCount(0);
-            lastActionFeedback.current = "Incorrect.";
-        }
-        setFeedback(`${feedbackText} ${isCorrect ? '✅' : '❌'}`);
-
-        switch(actionCode) {
-            case 'H':
-            case 'D':
-                dealCard(card => {
-                    if(!card) return;
-                    handsUpdater(prevHands => {
-                        const newHands = JSON.parse(JSON.stringify(prevHands));
-                        const currentHand = newHands[handIndex];
-                        currentHand.cards.push(card);
-                        Object.assign(currentHand, calculateScore(currentHand.cards));
-                        if(actionCode === 'D') currentHand.status = 'stood';
-                        return newHands;
-                    });
-                });
-                break;
-            case 'S': {
-                handsUpdater(prevHands => {
-                    const newHands = JSON.parse(JSON.stringify(prevHands));
-                    const currentHand = newHands[handIndex];
-                    currentHand.status = 'stood';
-                    return newHands;
-                });
-                break;
-            }
-            case 'P': {
-                const handToSplit = hands[handIndex].cards;
-                const isAces = handToSplit[0].rank === 'A';
-                
-                if (isAces) {
-                    dealCard(card1 => {
-                        dealCard(card2 => {
-                            const hand1 = { cards: [handToSplit[0], card1], status: 'stood' };
-                            const hand2 = { cards: [handToSplit[1], card2], status: 'stood' };
-                            Object.assign(hand1, calculateScore(hand1.cards));
-                            Object.assign(hand2, calculateScore(hand2.cards));
-                            setPlayerHands([hand1, hand2]);
-                        });
-                    });
-                } else {
-                    const newHands = JSON.parse(JSON.stringify(playerHands));
-                    newHands.splice(activeHandIndex, 1, 
-                        { cards: [handToSplit[0]], status: 'playing' },
-                        { cards: [handToSplit[1]], status: 'playing' }
-                    );
-                    setPlayerHands(newHands);
-                }
-                break;
-            }
-            default: break;
-        }
-    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, gameMode, playerHands, playerSeat, tableHands]);
-
+        // If the cut card was revealed in the last hand, we must create a new shoe first.
+        // The `createShoe` function is asynchronous (it sets state), so we wait with a timeout
+        // before dealing cards from the new shoe.
+        if (isCutCardRevealed) {
+            createShoe();
+            setTimeout(performDeal, 100);
+        } else {
+            // Otherwise, just deal the next hand from the existing shoe.
+            performDeal();
+        }
+    }, [isCutCardRevealed, gameMode, createShoe, calculateScore, dealCard]);
     const handlePlayerAction = useCallback((actionCode, actionName) => {
         if (gameMode === 'counting') {
             setPendingPlayerAction({ actionCode, actionName });
