@@ -152,19 +152,19 @@ const getCardCountValue = (card) => {
 
 const Card = ({ suit, rank, isHidden, isCutCard }) => {
     if (isCutCard) {
-        return <div className="flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold text-xs sm:text-base">CUT</div>;
+        return <div className="flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold text-xs sm:text-base">CUT</div>;
     }
     if (isHidden) {
-        return <div className="flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-14 h-20 sm:w-20 sm:h-32 md:w-28 md:h-40 bg-gray-600 rounded-md"></div></div>;
+        return <div className="flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-[calc(100%-0.5rem)] h-[calc(100%-0.5rem)] bg-gray-600 rounded-md"></div></div>;
     }
     const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
     return (
-        <div className="relative flex-shrink-0 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 bg-white rounded-lg border border-gray-200 shadow-md p-1 sm:p-2 transition-all transform animate-deal">
+        <div className="relative flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-white rounded-lg border border-gray-200 shadow-md p-1 sm:p-2 transition-all transform animate-deal">
             <div className={`absolute top-0.5 left-1 text-center leading-none ${suitColor}`}>
                 <p className="text-lg sm:text-2xl font-bold">{rank}</p>
                 <p className="text-base sm:text-xl">{suit}</p>
             </div>
-            <div className={`absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-6xl ${suitColor}`}>
+            <div className={`absolute inset-0 flex items-center justify-center text-[clamp(2.5rem,10vw,4rem)] sm:text-5xl md:text-6xl ${suitColor}`}> {/* Adjusted font size with clamp */}
                 {suit}
             </div>
             <div className={`absolute bottom-0.5 right-1 text-center leading-none rotate-180 ${suitColor}`}>
@@ -339,8 +339,8 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
         return card.rank;
     }, []);
 
-    const playerKey = getPlayerHandKeyForChart(playerHand);
-    const dealerKey = getDealerUpCardKeyForChart(dealerUpCard);
+    const playerKey = playerHand ? getPlayerHandKeyForChart(playerHand) : null;
+    const dealerKey = dealerUpCard ? getDealerUpCardKeyForChart(dealerUpCard) : null;
 
     const getActionColorClass = (action) => {
         switch (action) {
@@ -374,7 +374,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -407,7 +407,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -440,7 +440,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
                                 <tr className="bg-gray-700">
                                     <th className="p-1 text-center w-1/12">P</th>
                                     {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8%]">{rank}</th>
+                                        <th key={rank} className="p-1 text-center w-[9%]">{rank}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -1097,10 +1097,10 @@ export default function App() {
                         </button>
                     </header>
 
-                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
+                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]"> {/* Increased min-h */}
                         <div className="text-center mb-2">
                             <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
-                            <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
+                            <div className="flex justify-center items-center space-x-2 flex-wrap"> {/* Added flex-wrap */}
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
                         </div>
@@ -1141,7 +1141,7 @@ export default function App() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2 min-h-[152px] md:min-h-[188px]"> {/* Added flex-wrap and adjusted gaps */}
+                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2"> {/* Removed min-h, cards will dictate height */}
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
                                             {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
@@ -1168,7 +1168,7 @@ export default function App() {
                                                 <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">
                                                     {i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.status === 'bust' ? 'Bust' : hand.display}
                                                 </h3>
-                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1 min-h-[120px] scale-75"> {/* Added flex-wrap and adjusted gaps */}
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1"> {/* Removed min-h, cards will dictate height */}
                                                     {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                                 </div>
                                                 {/* Transparent Deal Button for Counting Mode (only on player's seat) - Active only at end of round */}
