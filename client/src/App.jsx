@@ -928,6 +928,7 @@ export default function App() {
                 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                 body {
                     font-family: 'Nunito', sans-serif;
+                    background-color: #111827;
                 }
                 .font-mono {
                     font-family: 'Roboto Mono', monospace;
