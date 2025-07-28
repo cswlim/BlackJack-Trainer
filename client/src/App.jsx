@@ -100,7 +100,7 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         return 'H';
     }
     if (hardTotal === 11) {
-        if (dealerValue === 11) return 'H'; // Player 11 vs Dealer Ace is now HIT
+        if (dealerValue === 11) return 'H';
         return canDouble ? 'D' : 'H';
     }
     if (hardTotal === 10) {
@@ -173,7 +173,7 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
     const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
     
     return (
-        <div className="w-full md:w-64 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 group">
+        <div className="w-full md:w-72 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 group">
             <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
                 <h3 className="text-lg font-bold">History</h3>
                 <div className="flex flex-col items-end text-sm space-y-1">
@@ -284,13 +284,11 @@ export default function App() {
                 }
             }
         }
-        // Shuffle
         for (let i = newDeck.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
         }
         
-        // Set cut card position (between 72% and 78% of the shoe)
         const min = Math.floor(newDeck.length * 0.72);
         const max = Math.floor(newDeck.length * 0.78);
         setCutCardPosition(Math.floor(Math.random() * (max - min + 1)) + min);
@@ -330,10 +328,9 @@ export default function App() {
         if (highScore > 21) {
             return { score: lowScore, isSoft: false, display: `${lowScore}` };
         } else {
-            if (highScore >= 18) { // For A-7, A-8, A-9
+            if (highScore >= 18) {
                  return { score: highScore, isSoft: true, display: `${highScore}` };
             }
-            // For A-A (2/12) through A-6 (7/17)
             return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
         }
     }, []);
@@ -342,7 +339,7 @@ export default function App() {
     const dealCard = useCallback((callback) => {
         setDeck(prevDeck => {
             if (prevDeck.length === 0) {
-                callback(null); // No card to deal
+                callback(null);
                 return [];
             }
             const newDeck = [...prevDeck];
@@ -540,7 +537,6 @@ export default function App() {
 
     // --- USEEFFECT HOOKS FOR GAME LOGIC ---
     
-    // Automatically deal a second card to a newly split hand
     useEffect(() => {
         if (gameState !== 'player-turn') return;
 
@@ -560,12 +556,11 @@ export default function App() {
                         return newHands;
                     });
                 });
-            }, 500); // Small delay to make the split visible
+            }, 500);
         }
     }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard]);
 
 
-    // Check player hand status (busts, 21, or all hands stood) after an action
     useEffect(() => {
         if (gameState !== 'player-turn') {
             setIsActionDisabled(false);
@@ -600,7 +595,7 @@ export default function App() {
                         setGameState('dealer-turn');
                     }
                 }
-            } else { // Counting mode
+            } else {
                 setActiveTableHandIndex(prev => prev + 1);
                 setGameState('ai-turn');
             }
@@ -614,7 +609,6 @@ export default function App() {
 
     }, [playerHands, tableHands, gameState, activeHandIndex, playerSeat, gameMode]);
 
-    // AI Turn Logic for Counting Mode
     useEffect(() => {
         if (gameState !== 'ai-turn') return;
 
@@ -660,12 +654,9 @@ export default function App() {
 
     }, [gameState, activeTableHandIndex, playerSeat, tableHands, dealerHand.cards, calculateScore, dealCard]);
 
-
-    // Dealer's Turn Logic
     useEffect(() => {
         if (gameState !== 'dealer-turn') return;
 
-        // Reveal dealer's hole card first
         setDealerHand(prev => ({
             ...prev,
             cards: prev.cards.map(c => ({...c, isHidden: false}))
@@ -678,38 +669,33 @@ export default function App() {
                 if (scoreInfo.score < 17) {
                     dealCard(card => {
                         if (card) {
-                            // Use timeout to create a delay for the next draw
                             setTimeout(() => {
                                 setDealerHand(prev => ({
                                     ...prev,
                                     cards: [...prev.cards, card],
                                     ...calculateScore([...prev.cards, card])
                                 }));
-                                dealerDrawLoop(); // Continue the loop
+                                dealerDrawLoop();
                             }, 1000);
                         } else {
-                            // No more cards, end turn
                             setGameState('end');
                         }
                     });
-                    return currentDealerHand; // Return current hand while waiting for async card
+                    return currentDealerHand;
                 } else {
-                    // Dealer stands, end the turn
                     setGameState('end');
                     return currentDealerHand;
                 }
             });
         };
         
-        // Start the drawing loop with a small delay after revealing the card
         setTimeout(dealerDrawLoop, 1000);
 
     }, [gameState, calculateScore, dealCard]);
     
-    // Consolidated End-of-Round Logic (Winner Determination & Auto-Deal)
     useEffect(() => {
         if (gameState === 'end' && !endOfRoundMessageSet.current) {
-            endOfRoundMessageSet.current = true; // Lock this effect to run only once per round end
+            endOfRoundMessageSet.current = true;
             
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
@@ -769,7 +755,6 @@ export default function App() {
         }
     }, [gameState, playerHands, tableHands, dealerHand.cards, calculateScore, gameMode, playerSeat]);
 
-    // Auto-clear feedback message
     useEffect(() => {
         if (feedback) {
             const timer = setTimeout(() => { setFeedback(''); }, 1500);
@@ -777,16 +762,15 @@ export default function App() {
         }
     }, [feedback]);
 
-    // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (event) => {
             if (showCountPrompt) return;
 
             if (gameState === 'player-turn') {
-                if (event.key.toLowerCase() === 'h' || event.key.toLowerCase() === 'j') handlePlayerAction('H', 'Hit');
-                if (event.key.toLowerCase() === 's' || event.key.toLowerCase() === 'k') handlePlayerAction('S', 'Stand');
-                if ((event.key.toLowerCase() === 'd' || event.key.toLowerCase() === 'l') && canDouble) handlePlayerAction('D', 'Double');
-                if ((event.key.toLowerCase() === 'p' || event.key === ';') && canSplit) handlePlayerAction('P', 'Split');
+                if (event.key.toLowerCase() === 'a') handlePlayerAction('H', 'Hit');
+                if (event.key.toLowerCase() === 's') handlePlayerAction('S', 'Stand');
+                if (event.key.toLowerCase() === 'd' && canDouble) handlePlayerAction('D', 'Double');
+                if (event.key.toLowerCase() === 'f' && canSplit) handlePlayerAction('P', 'Split');
             }
 
             if ((gameState === 'pre-deal' || gameState === 'end') && event.key === ' ') {
@@ -856,16 +840,13 @@ export default function App() {
         <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
             <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
                 <div className="flex-grow">
-                    {/* Header */}
                     <header className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-6">
                             <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
                         </div>
                     </header>
 
-                    {/* Game Table */}
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow">
-                        {/* Dealer's Hand */}
                         <div className="text-center mb-2">
                             <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `(${dealerHand.display})` : ''}</h2>
                             <div className="flex justify-center items-center space-x-2 min-h-[152px] md:min-h-[188px]">
@@ -873,28 +854,30 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* Feedback and Deal Button Area */}
                         <div className="text-center my-1 h-16 flex items-center justify-center">
-                            {(gameState === 'pre-deal' || gameState === 'end') && 
+                            {(gameState === 'pre-deal' || gameState === 'end') ? (
                                 <button 
                                     onClick={dealNewGame} 
                                     className="bg-blue-500 text-white font-semibold px-8 py-4 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400 text-xl"
                                 >
                                     Deal
                                 </button>
-                            }
-                             <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
-                                {feedback || message || 'Make your decision.'}
-                            </p>
+                            ) : (
+                                <p className="text-lg font-semibold bg-black bg-opacity-20 px-4 py-2 rounded-lg animate-fade-in">
+                                    {feedback || message}
+                                </p>
+                            )}
                         </div>
 
-                        {/* Player Area */}
                         {gameMode === 'solo' ? (
                             <div className="text-center">
                                 <div className="flex flex-wrap justify-center items-start gap-4">
                                     {playerHands.map((hand, i) => (
                                         <div key={i} className={`p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <h3 className="font-bold text-xl mb-1">Your Hand {playerHands.length > 1 ? `(#${i + 1})` : ''} ({hand.display}) {hand.status !== 'playing' && `(${hand.status})`}</h3>
+                                            <h3 className="font-bold text-xl mb-1">
+                                                {playerHands.length > 1 ? `Hand ${i + 1} ` : ''}
+                                                ({hand.display}) {hand.status !== 'playing' && `(${hand.status})`}
+                                            </h3>
                                             <div className="flex justify-center items-center space-x-2 mt-2 min-h-[152px] md:min-h-[188px]">
                                                 {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                             </div>
@@ -919,9 +902,8 @@ export default function App() {
                         )}
                     </div>
                     
-                    {/* Action Buttons */}
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                         {[['Hit', 'H', 'h', 'j'], ['Stand', 'S', 's', 'k'], ['Double', 'D', 'd', 'l'], ['Split', 'P', 'p', ';']].map(([actionName, actionCode, ...keys]) => (
+                         {[['Hit', 'H', 'a'], ['Stand', 'S', 's'], ['Double', 'D', 'd'], ['Split', 'P', 'f']].map(([actionName, actionCode, ...keys]) => (
                              <button
                                  key={actionName}
                                  onClick={() => handlePlayerAction(actionCode, actionName)}
@@ -932,7 +914,7 @@ export default function App() {
                                      ${actionCode === 'D' && 'bg-orange-400 text-white'}
                                      ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
                              >
-                                 <div className="flex flex-col">
+                                 <div className="flex flex-col text-center">
                                      <span>{actionName}</span>
                                      <span className="text-xs font-mono opacity-70">({keys.join('/')})</span>
                                  </div>
@@ -940,7 +922,10 @@ export default function App() {
                          ))}
                     </div>
                 </div>
-                {<div className="w-full md:w-72 mt-4 md:mt-0 flex-shrink-0"><HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} /><StreakCounter streak={streakCount} /></div>}
+                <div className="w-full md:w-72 mt-4 md:mt-0 flex-shrink-0">
+                    <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
+                    <StreakCounter streak={streakCount} />
+                </div>
             </div>
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
             <style>{`
