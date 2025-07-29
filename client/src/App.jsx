@@ -771,6 +771,8 @@ export default function App() {
                         {/* --- 2. Header updated with chart button --- */}
                         <header className="flex justify-between items-center mb-4">
                             <h1 className="text-3xl font-bold">Solo Mode</h1>
+                            
+                            {/* This button will appear in the top-right corner */}
                             <button
                                 onClick={() => setShowChartModal(true)}
                                 className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
