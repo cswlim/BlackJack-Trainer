@@ -240,59 +240,54 @@ const StreakCounter = ({ streak }) => {
 
     useEffect(() => {
         const prevStreak = prevStreakRef.current;
-
-        // --- Streak Reset Logic ---
         if (streak === 0 && prevStreak >= 2) {
             setDisplayStreak(prevStreak);
             setIsFadingOut(true);
-            // The component will be removed by the parent, but this resets its state
-            const timer = setTimeout(() => {
-                setIsFadingOut(false);
-            }, 1500); // Animation duration
+            const timer = setTimeout(() => setIsFadingOut(false), 1500);
             return () => clearTimeout(timer);
         }
-        
-        // --- Milestone and Update Logic ---
-        if (streak > 0) {
-             setDisplayStreak(streak);
-        }
-
-        // Check if a new milestone has been crossed
+        if (streak > 0) setDisplayStreak(streak);
         const prevMilestone = Math.floor(prevStreak / 50);
         const currentMilestone = Math.floor(streak / 50);
-
-        if (currentMilestone > prevMilestone) {
-            setMilestoneKey(prevKey => prevKey + 1); // Force re-trigger of milestone animation
-        }
-
+        if (currentMilestone > prevMilestone) setMilestoneKey(prevKey => prevKey + 1);
         prevStreakRef.current = streak;
     }, [streak]);
 
-
     if (streak < 2) {
-        // Render the fade-out animation if applicable
         if (isFadingOut) {
             return (
                 <div className="mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 animate-wash-away">
-                    <span className="text-2xl">💔</span>
-                    <span className="text-xl font-bold text-gray-400">{displayStreak} Streak Lost</span>
+                    <span className="text-2xl">💔</span><span className="text-xl font-bold text-gray-400">{displayStreak} Streak Lost</span>
                 </div>
             );
         }
-        return null; // Return null if streak is low and not fading out
+        return null;
     }
     
     const getContinuousStreakClass = () => {
-        if (streak >= 300) return 'animate-god-tier';
-        if (streak >= 250) return 'animate-mythic';
-        if (streak >= 200) return 'animate-grandmaster';
-        if (streak >= 150) return 'animate-crystal-focus';
-        if (streak >= 100) return 'animate-super-saiyan';
-        if (streak >= 50) return 'animate-pulse-fast';
-        if (streak >= 25) return 'animate-glow-strong';
-        if (streak >= 10) return 'animate-glow';
-        return 'text-white';
+        if (streak >= 300) return 'tier-8-box';
+        if (streak >= 250) return 'animate-fast-pulse-ring';
+        if (streak >= 200) return 'animate-slow-pulse-ring';
+        if (streak >= 150) return 'animate-slow-pulse';
+        if (streak >= 100) return 'animate-energy-flicker';
+        if (streak >= 50) return 'animate-blue-aura';
+        if (streak >= 25) return 'animate-bright-glow';
+        if (streak >= 10) return 'animate-subtle-glow';
+        return '';
     };
+
+    const isMilestone = streak > 0 && streak % 50 === 0 && prevStreakRef.current < streak;
+
+    return (
+        <div 
+            key={milestoneKey}
+            className={`streak-box mt-4 bg-gray-900 p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getContinuousStreakClass()} ${isMilestone ? 'animate-milestone-burst' : ''}`}
+        >
+            <span className={`text-2xl ${streak >= 300 ? 'cosmic-text' : ''}`}>🔥</span>
+            <span className={`text-xl font-bold ${streak >= 300 ? 'cosmic-text' : ''}`}>{displayStreak} Streak!</span>
+        </div>
+    );
+};
 
     // Apply milestone animation only when a milestone is hit
     const isMilestone = streak > 0 && streak % 50 === 0 && prevStreakRef.current < streak;
@@ -560,6 +555,9 @@ export default function App() {
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
     const [showChartModal, setShowChartModal] = useState(false); // State for chart modal
+    
+    const [announcement, setAnnouncement] = useState(null);
+    const prevStreakForAnnounceRef = useRef(0);
 
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
@@ -1078,6 +1076,17 @@ export default function App() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
 
+        useEffect(() => {
+        const prevStreak = prevStreakForAnnounceRef.current;
+        if ([100, 200, 300].includes(streakCount) && streakCount > prevStreak) {
+            setAnnouncement(streakCount);
+            const timer = setTimeout(() => setAnnouncement(null), 2500);
+            return () => clearTimeout(timer);
+        }
+        prevStreakForAnnounceRef.current = streakCount;
+    }, [streakCount]);
+
+
     const selectMode = (mode) => {
         setGameMode(mode);
         createShoe();
@@ -1145,6 +1154,13 @@ export default function App() {
     }
 
     return (
+           <> {announcement && (
+        <div id="fullscreen-announcement" className={`is-active announce-${announcement}`}>
+            <div className="content text-center">
+                <h2 id="announce-number" className={`text-7xl md:text-9xl font-black number ${announcement === 300 ? 'announce-cosmic-text' : ''}`}>{announcement}</h2>
+            </div>
+        </div>
+    )} </>
         <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
             <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
                 <div className="flex-grow">
@@ -1297,32 +1313,60 @@ export default function App() {
                @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                 body {
                     font-family: 'Nunito', sans-serif;
+                    overflow-x: hidden;
                 }
-                .font-mono {
-                    font-family: 'Roboto Mono', monospace;
-                }
-                @keyframes deal {
-                    from { opacity: 0; transform: translateY(-20px) scale(0.8); }
-                    to { opacity: 1; transform: translateY(0) scale(1); }
-                }
-                .animate-deal { animation: deal 0.4s ease-out forwards; }
-                @keyframes fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
                 
-                /* --- NEW: One-Shot Animation for Milestones --- */
+                .streak-box {
+                    position: relative;
+                    z-index: 1;
+                }
+                
+                /* --- Base Animations --- */
+                @keyframes deal {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-20px) scale(0.8);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                .animate-deal {
+                    animation: deal 0.4s ease-out forwards;
+                }
+                
+                @keyframes fade-in {
+                    from {
+                        opacity: 0;
+                    }
+                    to {
+                        opacity: 1;
+                    }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.3s ease-out forwards;
+                }
+                
+                /* --- One-Shot Animations --- */
                 @keyframes milestone-burst {
-                    0% { transform: scale(0.5); opacity: 0; }
-                    50% { transform: scale(1.2) rotate(-5deg); opacity: 1; }
-                    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                    0% {
+                        transform: scale(0.8);
+                        opacity: 0;
+                    }
+                    50% {
+                        transform: scale(1.1);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(1);
+                        opacity: 1;
+                    }
                 }
                 .animate-milestone-burst {
-                    animation: milestone-burst 0.6s ease-out forwards;
+                    animation: milestone-burst 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
                 }
                 
-                /* --- NEW: Animation for Losing a Streak --- */
                 @keyframes wash-away {
                     from {
                         opacity: 1;
@@ -1339,67 +1383,197 @@ export default function App() {
                     animation: wash-away 1.5s ease-in forwards;
                 }
                 
-                /* --- REVISED: Continuous Animations for Progression --- */
-                /* Tier 1 (10+): Subtle constant glow */
-                @keyframes glow {
-                    0%, 100% { text-shadow: 0 0 5px #ffffff44; }
-                    50% { text-shadow: 0 0 10px #ffffff66; }
+                /* --- Continuous Animations --- */
+                @keyframes subtle-glow {
+                    0%, 100% { text-shadow: 0 0 6px #ffffff55; }
+                    50% { text-shadow: 0 0 10px #ffffff88; }
                 }
-                .animate-glow { animation: glow 2s ease-in-out infinite; }
-                
-                /* Tier 2 (25+): Stronger glow */
-                @keyframes glow-strong {
-                    0%, 100% { text-shadow: 0 0 10px #ffffff88, 0 0 20px #ffffff66; }
-                    50% { text-shadow: 0 0 20px #ffffffaa, 0 0 40px #ffffff88; }
-                }
-                .animate-glow-strong { animation: glow-strong 1.5s ease-in-out infinite; }
-                
-                /* Tier 3 (50+): Adds color and a faster pulse */
-                @keyframes pulse-fast {
-                    0%, 100% { transform: scale(1); text-shadow: 0 0 10px #ef444499; }
-                    50% { transform: scale(1.05); text-shadow: 0 0 20px #ef4444; }
-                }
-                .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; color: #fecaca; }
-                
-                /* Tier 4 (100+): The iconic "Super Saiyan" energy aura */
-                 @keyframes super-saiyan {
-                    0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
-                    50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
-                }
-                .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; color: #fef08a; }
-                
-                /* Tier 5 (150+): NEW "Crystal Focus" - a sharp, magical aura */
-                @keyframes crystal-focus {
-                    0%, 100% { text-shadow: 0 0 7px #fff, 0 0 10px #fff, 0 0 21px #fff, 0 0 42px #0ff, 0 0 82px #0ff; }
-                    50% { text-shadow: 0 0 7px #fff, 0 0 10px #fff, 0 0 21px #fff, 0 0 42px #f0f, 0 0 82px #f0f; }
-                }
-                .animate-crystal-focus { animation: crystal-focus 2s ease-in-out infinite; color: #e0e7ff; }
-                
-                /* Tier 6 (200+): Rainbow gradient text */
-                @keyframes grandmaster {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
-                .animate-grandmaster {
-                    background-size: 200% 200%;
-                    animation: grandmaster 3s ease-in-out infinite;
-                    /* Applied directly to the component with Tailwind */
+                .animate-subtle-glow {
+                    animation: subtle-glow 2.5s ease-in-out infinite;
                 }
                 
-                /* Tier 7 (250+): A chaotic, multi-colored glow */
-                @keyframes mythic {
-                    0%, 100% { text-shadow: 0 0 10px #ffc300, 0 0 20px #ff5733, 0 0 30px #c70039, 0 0 40px #900c3f; }
-                    50% { text-shadow: 0 0 15px #ffc300, 0 0 25px #ff5733, 0 0 35px #c70039, 0 0 50px #900c3f; transform: scale(1.02); }
+                @keyframes bright-glow {
+                    0%, 100% { text-shadow: 0 0 8px #ffffffaa, 0 0 12px #ffffff88; }
+                    50% { text-shadow: 0 0 16px #ffffff, 0 0 24px #ffffffaa; }
                 }
-                .animate-mythic { animation: mythic 1s ease-in-out infinite; color: #ffedd5; }
+                .animate-bright-glow {
+                    animation: bright-glow 2s ease-in-out infinite;
+                }
                 
-                /* Tier 8 (300+): The ultimate "God Tier" aura */
-                @keyframes god-tier {
-                    0% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
-                    50% { text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6, 0 0 60px #ff4da6, 0 0 70px #ff4da6, 0 0 80px #ff4da6; }
-                    100% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
+                @keyframes blue-aura {
+                    0%, 100% { text-shadow: 0 0 10px #60a5fa, 0 0 20px #3b82f6; }
+                    50% { text-shadow: 0 0 15px #93c5fd, 0 0 30px #60a5fa; }
                 }
-                .animate-god-tier { animation: god-tier 2s linear infinite; }
+                .animate-blue-aura {
+                    animation: blue-aura 2s ease-in-out infinite;
+                    color: #dbeafe;
+                }
+                
+                @keyframes energy-flicker {
+                    0% { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
+                    25% { text-shadow: 0 0 12px #fde047, 0 0 25px #facc15; }
+                    50% { text-shadow: 0 0 10px #fde047, 0 0 22px #facc15; }
+                    75% { text-shadow: 0 0 14px #fde047, 0 0 28px #facc15; }
+                    100% { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
+                }
+                .animate-energy-flicker {
+                    animation: energy-flicker 1.5s linear infinite;
+                    color: #fef9c3;
+                }
+                
+                @keyframes slow-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                .animate-slow-pulse {
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                    color: #ede9fe;
+                }
+                
+                @keyframes ring-glow-rose {
+                    from { box-shadow: 0 0 10px 0px #fecdd3, inset 0 0 10px 0px #fecdd3; }
+                    to { box-shadow: 0 0 20px 5px #fecdd3, inset 0 0 20px 2px #fecdd3; }
+                }
+                .animate-slow-pulse-ring {
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                    color: #fecdd3;
+                    text-shadow: 0 0 12px #fecdd3;
+                }
+                .animate-slow-pulse-ring::before {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 1rem;
+                    z-index: -1;
+                    animation: ring-glow-rose 2.5s ease-in-out infinite alternate;
+                }
+                
+                @keyframes fast-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.08); }
+                }
+                @keyframes text-glow-red {
+                    from { text-shadow: 0 0 10px #fca5a5, 0 0 20px #ef4444; }
+                    to { text-shadow: 0 0 20px #fca5a5, 0 0 30px #ef4444, 0 0 40px #ef4444; }
+                }
+                .animate-fast-pulse-ring {
+                    animation: fast-pulse 1s ease-in-out infinite, text-glow-red 1.5s ease-in-out infinite alternate;
+                    color: #fca5a5;
+                }
+                .animate-fast-pulse-ring::before {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 1rem;
+                    z-index: -1;
+                    animation: ring-glow-rose 1s ease-in-out infinite alternate;
+                }
+                
+                @keyframes cosmic-border-shift {
+                    to { background-position: 200% center; }
+                }
+                @keyframes cosmic-text-glow {
+                    from { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff; }
+                    to { text-shadow: 0 0 20px #fff, 0 0 30px #60a5fa, 0 0 40px #60a5fa; }
+                }
+                @keyframes aura-ring-pulse {
+                    from { box-shadow: 0 0 20px 5px #ffffff88; opacity: 0.7; }
+                    to { box-shadow: 0 0 35px 15px #ffffff00; opacity: 1; }
+                }
+                .tier-8-box {
+                    background-color: #1e1b4b;
+                    border: 4px solid transparent;
+                    background-clip: padding-box;
+                    position: relative;
+                }
+                .tier-8-box::before {
+                    content: '';
+                    position: absolute;
+                    top: -4px; bottom: -4px; left: -4px; right: -4px;
+                    background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
+                    background-size: 200% 100%;
+                    border-radius: 1rem;
+                    animation: cosmic-border-shift 4s linear infinite;
+                    z-index: -1;
+                }
+                .tier-8-box::after {
+                    content: '';
+                    position: absolute;
+                    inset: -10px;
+                    border-radius: 1.25rem;
+                    z-index: -2;
+                    animation: aura-ring-pulse 2s ease-in-out infinite alternate;
+                }
+                .tier-8-box .cosmic-text {
+                    color: #fff;
+                    animation: cosmic-text-glow 2s ease-in-out infinite alternate;
+                }
+                
+                /* --- Fullscreen Announcements --- */
+                #fullscreen-announcement {
+                    display: none;
+                    position: fixed;
+                    inset: 0;
+                    background-color: rgba(0, 0, 0, 0.8);
+                    z-index: 100;
+                    align-items: center;
+                    justify-content: center;
+                    backdrop-filter: blur(5px);
+                }
+                @keyframes announce-fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes announce-text-zoom {
+                    from { transform: scale(0.5); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                #fullscreen-announcement.is-active {
+                    display: flex;
+                    animation: announce-fade-in 0.3s ease-out;
+                }
+                #fullscreen-announcement .content {
+                    animation: announce-text-zoom 0.7s 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+                }
+                .announce-100 .number {
+                    color: #93c5fd;
+                    text-shadow: 0 0 15px #60a5fa, 0 0 25px #3b82f6;
+                }
+                
+                @keyframes starfield {
+                    from { background-position: 0 0; }
+                    to { background-position: -10000px 5000px; }
+                }
+                .announce-200 {
+                    background-image: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png);
+                    animation: starfield 200s linear infinite;
+                }
+                .announce-200 .number {
+                    color: #d8b4fe;
+                    text-shadow: 0 0 15px #a855f7, 0 0 30px #a855f7;
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                }
+                
+                @keyframes screen-shake {
+                    0%, 100% { transform: translate(0, 0); }
+                    10%, 30%, 50%, 70%, 90% { transform: translate(-2px, 2px); }
+                    20%, 40%, 60%, 80% { transform: translate(2px, -2px); }
+                }
+                @keyframes rainbow-shift {
+                    to { background-position: 200% center; }
+                }
+                .announce-300 {
+                    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 60%), url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png), url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/twinkling.png);
+                    animation: starfield 100s linear infinite, screen-shake 0.5s linear;
+                }
+                .announce-300 .number {
+                    background-image: linear-gradient(to right, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    color: transparent;
+                    animation: rainbow-shift 3s linear infinite;
+                }
             `}</style>
         </div>
     );
