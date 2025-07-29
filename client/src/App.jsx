@@ -689,7 +689,17 @@ export default function App() {
 
         switch(actionCode) {
             case 'H':
-            case 'D':
+                dealCard(card => {
+                    if(!card) return;
+                    handsUpdater(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        newHands[handIndex].cards.push(card);
+                        Object.assign(newHands[handIndex], calculateScore(newHands[handIndex].cards));
+                        return newHands;
+                    });
+                });
+                break;
+            case 'D': // LOGIC FIX 1: Correctly handle double down status
                 dealCard(card => {
                     if(!card) return;
                     handsUpdater(prevHands => {
@@ -697,9 +707,11 @@ export default function App() {
                         const currentHand = newHands[handIndex];
                         currentHand.cards.push(card);
                         Object.assign(currentHand, calculateScore(currentHand.cards));
-                        if(actionCode === 'D') {
+                        currentHand.isDoubled = true;
+                        if (currentHand.score > 21) {
+                            currentHand.status = 'bust';
+                        } else {
                             currentHand.status = 'stood';
-                            currentHand.isDoubled = true; // FIX 4: Mark hand as doubled
                         }
                         return newHands;
                     });
@@ -953,27 +965,27 @@ export default function App() {
             } else {
                 handsToEvaluate.forEach((hand, index) => {
                     if (!hand) return;
-                    const outcomeValue = hand.isDoubled ? 2 : 1; // FIX 4: Check if doubled
+                    const outcomeValue = hand.isDoubled ? 2 : 1;
                     resultMessage += `Hand ${index + 1}: `;
+                    // LOGIC FIX 2: Correctly check for bust first
                     if (hand.status === 'bust') {
                         resultMessage += 'You lose (Busted). ';
-                        handLosses += outcomeValue; // FIX 4: Apply outcome value
+                        handLosses += outcomeValue;
                     } else if (dealerScoreInfo.score > 21) {
                         resultMessage += 'You win (Dealer Busted). ';
-                        handWins += outcomeValue; // FIX 4: Apply outcome value
+                        handWins += outcomeValue;
                     } else if (hand.score > dealerScoreInfo.score) {
                         resultMessage += 'You win (Higher Score). ';
-                        handWins += outcomeValue; // FIX 4: Apply outcome value
+                        handWins += outcomeValue;
                     } else if (hand.score < dealerScoreInfo.score) {
                         resultMessage += 'You lose (Lower Score). ';
-                        handLosses += outcomeValue; // FIX 4: Apply outcome value
+                        handLosses += outcomeValue;
                     } else {
                         resultMessage += 'Push. ';
-                        pushes++; // Per request, push is always 1
+                        pushes++;
                     }
                 });
 
-                // FIX 3: Update counts based on per-hand results
                 setWinCount(prev => prev + handWins);
                 setLossCount(prev => prev + handLosses);
                 setPushCount(prev => prev + pushes);
@@ -1102,16 +1114,14 @@ export default function App() {
 
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
                         <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
-                            <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap"> {/* Adjusted gap and added flex-wrap */}
+                            {/* TEXT CHANGE */}
+                            <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
+                            <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                             </div>
                         </div>
 
-                        {/* Central Deal Button / Feedback Message */}
                         <div className="text-center my-0 h-10 flex items-center justify-center">
-                            {/* FIX 2: This block is removed */}
-                            {/* Concise feedback message */}
                             {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
                                 <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
                                     {feedback}
@@ -1121,7 +1131,6 @@ export default function App() {
 
                         {gameMode === 'solo' ? (
                             <div className="text-center">
-                                {/* FIX 2: New logic for deal area */}
                                 {(playerHands.length === 0 && (gameState === 'pre-deal' || gameState === 'pre-game')) ? (
                                     <div
                                         onClick={dealNewGame}
@@ -1149,7 +1158,6 @@ export default function App() {
                                                 <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
                                                     {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                                 </div>
-                                                {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
                                                 {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
                                                     <button
                                                         onClick={dealNewGame}
@@ -1177,7 +1185,6 @@ export default function App() {
                                                 <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1">
                                                     {hand.cards.map((card, j) => <Card key={j} {...card} />)}
                                                 </div>
-                                                {/* Transparent Deal Button for Counting Mode (only on player's seat) - Active only at end of round */}
                                                 {gameMode === 'counting' && i === playerSeat && (gameState !== 'pre-deal' && gameState !== 'pre-game') && (
                                                     <button
                                                         onClick={dealNewGame}
@@ -1206,7 +1213,6 @@ export default function App() {
                                     key={actionName}
                                     onClick={() => handlePlayerAction(actionCode, actionName)}
                                     disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                    // FIX 1: Make all buttons the same size
                                     className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
                                         ${actionCode === 'H' && 'bg-green-500 text-white'}
                                         ${actionCode === 'S' && 'bg-red-500 text-white'}
@@ -1220,9 +1226,8 @@ export default function App() {
                 </div>
                 {/* Responsive order for History and Streak */}
                 <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0">
-                    {/* StreakCounter is above HistoryTracker on mobile due to flex-col-reverse */}
                     <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
-                    <div className="md:hidden h-4"></div> {/* Small buffer for mobile only */}
+                    <div className="md:hidden h-4"></div>
                     <StreakCounter streak={streakCount} />
                 </div>
             </div>
@@ -1232,7 +1237,7 @@ export default function App() {
                     playerHand={activePlayerHand} 
                     dealerUpCard={dealerUpCard} 
                     onClose={() => setShowChartModal(false)}
-                    calculateScore={calculateScore} // Pass calculateScore to the modal
+                    calculateScore={calculateScore}
                 />
             )}
             <style>{`
