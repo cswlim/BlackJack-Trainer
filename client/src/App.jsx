@@ -182,7 +182,7 @@ const StreakCounter = ({ streak }) => {
     return (
         <div 
             key={milestoneKey}
-            className={`streak-box mt-4 bg-gray-900 p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getContinuousStreakClass()} ${isMilestone ? 'animate-milestone-burst' : ''}`}
+            className={`streak-box mt-4 bg-gray-800 p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getContinuousStreakClass()} ${isMilestone ? 'animate-milestone-burst' : ''}`}
         >
             <span className={`text-2xl ${streak >= 300 ? 'cosmic-text' : ''}`}>🔥</span>
             <span className={`text-xl font-bold ${streak >= 300 ? 'cosmic-text' : ''}`}>{displayStreak} Streak!</span>
