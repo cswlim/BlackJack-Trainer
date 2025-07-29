@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-//this is the most stable version so far with everything.
+//this is the most stable version so far with everything. a
 // --- HELPER FUNCTIONS & DATA ---
 
 const getBasicStrategy = (playerHand, dealerUpCard) => {
