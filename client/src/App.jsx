@@ -431,6 +431,9 @@ export default function App() {
     const endOfRoundMessageSet = useRef(false);
     const [announcement, setAnnouncement] = useState(null);
     const prevStreakForAnnounceRef = useRef(0);
+    
+    // --- 1. State for showing/hiding the chart modal ---
+    const [showChartModal, setShowChartModal] = useState(false);
 
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
@@ -643,7 +646,7 @@ export default function App() {
         if (gameState !== 'dealer-turn') return;
         setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
         const dealerDrawLoop = () => {
-            setDealerHand(currentDealerHand => {
+             setDealerHand(currentDealerHand => {
                 const scoreInfo = calculateScore(currentDealerHand.cards);
                 if (scoreInfo.score < 17) {
                     dealCard(card => {
@@ -765,7 +768,19 @@ export default function App() {
             <div className="min-h-screen p-4 flex flex-col items-center bg-gray-900 text-gray-100">
                 <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
                     <div className="flex-grow">
-                        <header className="flex justify-between items-center mb-4"><h1 className="text-3xl font-bold">Solo Mode</h1></header>
+                        {/* --- 2. Header updated with chart button --- */}
+                        <header className="flex justify-between items-center mb-4">
+                            <h1 className="text-3xl font-bold">Solo Mode</h1>
+                            <button
+                                onClick={() => setShowChartModal(true)}
+                                className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
+                                title="View Basic Strategy Chart"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </button>
+                        </header>
                         <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
                             <div className="text-center mb-2">
                                 <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
@@ -807,6 +822,15 @@ export default function App() {
                         <StreakCounter streak={streakCount} />
                     </div>
                 </div>
+                {/* --- 3. Conditionally render the chart modal --- */}
+                {showChartModal && (
+                    <BasicStrategyChartModal 
+                        playerHand={playerHands[activeHandIndex]?.cards} 
+                        dealerUpCard={dealerHand.cards.find(c => !c.isHidden)} 
+                        onClose={() => setShowChartModal(false)}
+                        calculateScore={calculateScore}
+                    />
+                )}
                 <style>{`
                     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                     body { font-family: 'Nunito', sans-serif; overflow-x: hidden; }
