@@ -697,7 +697,10 @@ export default function App() {
                         const currentHand = newHands[handIndex];
                         currentHand.cards.push(card);
                         Object.assign(currentHand, calculateScore(currentHand.cards));
-                        if(actionCode === 'D') currentHand.status = 'stood';
+                        if(actionCode === 'D') {
+                            currentHand.status = 'stood';
+                            currentHand.isDoubled = true; // FIX 4: Mark hand as doubled
+                        }
                         return newHands;
                     });
                 });
@@ -950,28 +953,30 @@ export default function App() {
             } else {
                 handsToEvaluate.forEach((hand, index) => {
                     if (!hand) return;
+                    const outcomeValue = hand.isDoubled ? 2 : 1; // FIX 4: Check if doubled
                     resultMessage += `Hand ${index + 1}: `;
                     if (hand.status === 'bust') {
                         resultMessage += 'You lose (Busted). ';
-                        handLosses++;
+                        handLosses += outcomeValue; // FIX 4: Apply outcome value
                     } else if (dealerScoreInfo.score > 21) {
                         resultMessage += 'You win (Dealer Busted). ';
-                        handWins++;
+                        handWins += outcomeValue; // FIX 4: Apply outcome value
                     } else if (hand.score > dealerScoreInfo.score) {
                         resultMessage += 'You win (Higher Score). ';
-                        handWins++;
+                        handWins += outcomeValue; // FIX 4: Apply outcome value
                     } else if (hand.score < dealerScoreInfo.score) {
                         resultMessage += 'You lose (Lower Score). ';
-                        handLosses++;
+                        handLosses += outcomeValue; // FIX 4: Apply outcome value
                     } else {
                         resultMessage += 'Push. ';
-                        pushes++;
+                        pushes++; // Per request, push is always 1
                     }
                 });
 
-                if (handWins > handLosses) setWinCount(prev => prev + 1);
-                else if (handLosses > handWins) setLossCount(prev => prev + 1);
-                else if (pushes > 0) setPushCount(prev => prev + pushes);
+                // FIX 3: Update counts based on per-hand results
+                setWinCount(prev => prev + handWins);
+                setLossCount(prev => prev + handLosses);
+                setPushCount(prev => prev + pushes);
             }
             
             setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
@@ -1105,14 +1110,7 @@ export default function App() {
 
                         {/* Central Deal Button / Feedback Message */}
                         <div className="text-center my-0 h-10 flex items-center justify-center">
-                            {(gameState === 'pre-deal' || gameState === 'pre-game') && (
-                                <button 
-                                    onClick={dealNewGame} 
-                                    className="bg-blue-500 text-white font-semibold px-8 py-4 rounded-lg shadow-md hover:bg-blue-600 transition disabled:bg-gray-400 text-xl"
-                                >
-                                    Deal
-                                </button>
-                            )}
+                            {/* FIX 2: This block is removed */}
                             {/* Concise feedback message */}
                             {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
                                 <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
@@ -1123,39 +1121,49 @@ export default function App() {
 
                         {gameMode === 'solo' ? (
                             <div className="text-center">
-                                <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2"> {/* Adjusted gap */}
-                                    {playerHands.map((hand, i) => (
-                                        <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
-                                                <div className="flex justify-center items-center gap-2">
-                                                    <span>
-                                                        {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
-                                                        {hand.status === 'bust' ? 'Bust' : hand.display}
-                                                    </span>
-                                                    {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
-                                                        <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
-                                                            SPLIT
+                                {/* FIX 2: New logic for deal area */}
+                                {(playerHands.length === 0 && (gameState === 'pre-deal' || gameState === 'pre-game')) ? (
+                                    <div
+                                        onClick={dealNewGame}
+                                        className="min-h-[250px] flex items-center justify-center bg-gray-800/50 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        <p className="text-2xl font-bold text-gray-400">Tap to Deal</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2">
+                                        {playerHands.map((hand, i) => (
+                                            <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
+                                                <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
+                                                    <div className="flex justify-center items-center gap-2">
+                                                        <span>
+                                                            {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
+                                                            {hand.status === 'bust' ? 'Bust' : hand.display}
                                                         </span>
-                                                    )}
+                                                        {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
+                                                            <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
+                                                                SPLIT
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
+                                                    {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                                </div>
+                                                {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
+                                                {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
+                                                    <button
+                                                        onClick={dealNewGame}
+                                                        disabled={gameState !== 'end'}
+                                                        className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                                    ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                    transition-all duration-300`}
+                                                    >
+                                                    </button>
+                                                )}
                                             </div>
-                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
-                                                {hand.cards.map((card, j) => <Card key={j} {...card} />)}
-                                            </div>
-                                            {/* Transparent Deal Button for Solo Mode - Active only at end of round */}
-                                            {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
-                                                <button
-                                                    onClick={dealNewGame}
-                                                    disabled={gameState !== 'end'}
-                                                    className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
-                                                                ${gameState === 'end' ? 'cursor-pointer' : ''}
-                                                                transition-all duration-300`}
-                                                >
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ) : (
                                 <div className="text-center">
@@ -1198,7 +1206,8 @@ export default function App() {
                                     key={actionName}
                                     onClick={() => handlePlayerAction(actionCode, actionName)}
                                     disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                    className={`px-4 py-3 md:px-6 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                    // FIX 1: Make all buttons the same size
+                                    className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
                                         ${actionCode === 'H' && 'bg-green-500 text-white'}
                                         ${actionCode === 'S' && 'bg-red-500 text-white'}
                                         ${actionCode === 'D' && 'bg-orange-400 text-white'}
