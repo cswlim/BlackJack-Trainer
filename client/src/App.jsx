@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 // --- HELPER FUNCTIONS & DATA ---
 
-// NOTE: This is the user's provided getBasicStrategy function
 const getBasicStrategy = (playerHand, dealerUpCard) => {
     const handValue = card => {
         if (!card) return 0;
@@ -47,6 +46,9 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
     const dealerValue = handValue(dealerUpCard);
     const canDouble = playerHand.length === 2;
 
+    // Strategy based on the provided chart (4/6/8 Decks, Dealer Stands on All 17s)
+    // H = Hit, S = Stand, D = Double, P = Split, R = Surrender (not implemented, default to H)
+
     // Pairs
     if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
         const rank = playerHand[0].rank;
@@ -64,46 +66,54 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
                 if (dealerValue <= 6) return 'P';
                 return 'H';
             case '5':
-                if (dealerValue <= 9) return canDouble ? 'D' : 'H';
+                if (dealerValue <= 9) return canDouble ? 'D' : 'H'; // Chart says D vs 2-9
                 return 'H';
             case '4':
+                // Custom rule: 4,4 vs 4 is Hit, not Split (as per user request, overriding chart)
                 if (dealerValue === 4) return 'H';
-                if ([5, 6].includes(dealerValue)) return 'P';
-                return 'H';
+                if ([5, 6].includes(dealerValue)) return 'P'; // Chart says P vs 5,6
+                return 'H'; // All other 4,4 pairs are Hit
             case '3': case '2':
                 if (dealerValue <= 7) return 'P';
                 return 'H';
-            default: return 'H';
+            default: return 'H'; // Should not happen
         }
     }
 
     // Soft Totals
     if (player.isSoft) {
-        const softTotal = player.score;
+        const softTotal = player.score; // This is the high score (e.g., A+7 = 18)
         switch (softTotal) {
-            case 20: return 'S';
-            case 19:
+            case 20: // A,9
+                return 'S';
+            case 19: // A,8
                 if (dealerValue === 6) return canDouble ? 'D' : 'S';
                 return 'S';
-            case 18:
+            case 18: // A,7
                 if ([2, 3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'S';
                 if ([7, 8].includes(dealerValue)) return 'S';
                 return 'H';
-            case 17:
+            case 17: // A,6
                 if ([3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
                 return 'H';
-            case 16: case 15:
+            case 16: // A,5
                 if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
                 return 'H';
-            case 14: case 13:
+            case 15: // A,4
+                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 14: // A,3
                 if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
                 return 'H';
-            default: return 'H';
+            case 13: // A,2
+                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            default: return 'H'; // Should not happen for soft totals < 13
         }
     }
 
     // Hard Totals
-    const hardTotal = player.score;
+    const hardTotal = player.score; // This is the final score if not soft
     if (hardTotal >= 17) return 'S';
     if (hardTotal >= 13 && hardTotal <= 16) {
         if (dealerValue <= 6) return 'S';
@@ -114,7 +124,7 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         return 'H';
     }
     if (hardTotal === 11) {
-        if (dealerValue === 11) return 'H';
+        if (dealerValue === 11) return 'H'; // Chart says H vs A
         return canDouble ? 'D' : 'H';
     }
     if (hardTotal === 10) {
@@ -125,9 +135,10 @@ const getBasicStrategy = (playerHand, dealerUpCard) => {
         if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
         return 'H';
     }
+    // Hard totals 5-8 (chart says H for all)
     if (hardTotal >= 5 && hardTotal <= 8) return 'H';
 
-    return 'H';
+    return 'H'; // Default catch-all, should be covered by above
 };
 
 const getCardCountValue = (card) => {
@@ -247,10 +258,12 @@ const StreakCounter = ({ streak }) => {
 
 const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
     const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
+    // Hard totals from the provided chart, including 5-7 as a range
     const hardTotals = ['5-7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
     const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
-    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As'];
+    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As']; // Updated pairs notation
 
+    // Strategy data matching the provided image
     const strategyData = {
         hard: {
             '17+': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
@@ -263,7 +276,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
             '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
             '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
-            '5-7': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'], // Bug fix: Was '7-'
+            '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
         },
         soft: {
             'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
@@ -283,7 +296,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             '7s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
             '6s': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
             '5s': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
-            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
+            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'], // Changed 4,4 vs 4 from P to H
             '3s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
             '2s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
         }
@@ -294,10 +307,12 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
         const { score, isSoft } = calculateScore(hand);
         const ranks = hand.map(card => card.rank);
 
+        // Handle pairs (normalize J,Q,K to 10)
         if (hand.length === 2 && ranks[0] === ranks[1]) {
             const normalizedRank = ['J', 'Q', 'K'].includes(ranks[0]) ? '10' : ranks[0];
-            return `${normalizedRank}s`;
+            return `${normalizedRank}s`; // Use 's' suffix
         }
+        // Handle soft totals
         if (isSoft) {
             if (score >= 20) return 'A,9';
             if (score === 19) return 'A,8';
@@ -308,6 +323,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             if (score === 14) return 'A,3';
             if (score === 13) return 'A,2';
         }
+        // Handle hard totals
         if (score >= 17) return '17+';
         if (score >= 5 && score <= 7) return '5-7';
         return `${score}`;
@@ -315,6 +331,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
 
     const getDealerUpCardKeyForChart = useCallback((card) => {
         if (!card) return null;
+        // Normalize J,Q,K to 10 for dealer's up-card
         if (['J', 'Q', 'K'].includes(card.rank)) return '10';
         if (card.rank === 'A') return 'A';
         return card.rank;
@@ -325,63 +342,126 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
 
     const getActionColorClass = (action) => {
         switch (action) {
-            case 'H': return 'bg-green-700 text-white';
-            case 'S': return 'bg-red-700 text-white';
-            case 'D': return 'bg-orange-700 text-white';
-            case 'P': return 'bg-blue-900 text-white';
-            default: return 'bg-gray-700 text-gray-100';
+            case 'H': return 'bg-green-700 text-white';   // Hit: Muted Green
+            case 'S': return 'bg-red-700 text-white';     // Stand: Muted Red
+            case 'D': return 'bg-orange-700 text-white';  // Double: Muted Orange/Gold
+            case 'P': return 'bg-blue-900 text-white';    // Split: Darker Blue (Navy)
+            default: return 'bg-gray-700 text-gray-100';  // Default or unknown
         }
     };
-    
-    // Helper function to render a table section
-    const renderTable = (title, rowKeys, data) => (
-        <div>
-            <h3 className="text-lg font-semibold mb-2 text-yellow-300">{title}</h3>
-            <table className="w-full table-fixed border-collapse text-sm">
-                <thead>
-                    <tr className="bg-gray-700">
-                        <th className="p-1 text-center w-1/12">P</th>
-                        {dealerRanks.map(rank => <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>)}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rowKeys.slice().reverse().map(playerTotal => (
-                        <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                            <td className="p-1 text-center font-bold">{playerTotal}</td>
-                            {dealerRanks.map((dealerRank, colIndex) => {
-                                const isHighlighted = playerKey === playerTotal && dealerKey === dealerRank;
-                                const cellValue = data[playerTotal] ? data[playerTotal][colIndex] : '?';
-                                return (
-                                    <td key={dealerRank} className={`p-1 text-center font-semibold
-                                        ${getActionColorClass(cellValue)}
-                                        ${isHighlighted ? 'relative z-10 ring-2 ring-yellow-400' : ''}`}>
-                                        {cellValue}
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
             <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-sm md:max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
                 <button
                     onClick={onClose}
-                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors z-20"
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
                 <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Basic Strategy Chart</h2>
+
                 <div className="space-y-6">
-                    {renderTable("Hard Totals", hardTotals, strategyData.hard)}
-                    {renderTable("Soft Totals", softTotals, strategyData.soft)}
-                    {renderTable("Pairs", pairs, strategyData.pairs)}
+                    {/* Hard Totals */}
+                    <div>
+                        <h3 className="text-lg font-semibold mb-2 text-yellow-300">Hard Totals</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {hardTotals.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.hard[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Soft Totals */}
+                    <div>
+                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Soft Totals</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {softTotals.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.soft[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pairs */}
+                    <div>
+                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Pairs</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pairs.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.pairs[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -414,7 +494,7 @@ export default function App() {
 
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
-    const [isFeedbackCorrect, setIsFeedbackCorrect] = useState(false);
+    const [isFeedbackCorrect, setIsFeedbackCorrect] = useState(false); // New state for feedback color
     const [history, setHistory] = useState([]);
     const [correctCount, setCorrectCount] = useState(0);
     const [incorrectCount, setIncorrectCount] = useState(0);
@@ -427,7 +507,7 @@ export default function App() {
     const [isActionDisabled, setIsActionDisabled] = useState(false);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
-    const [showChartModal, setShowChartModal] = useState(false);
+    const [showChartModal, setShowChartModal] = useState(false); // State for chart modal
 
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
@@ -511,7 +591,7 @@ export default function App() {
             lastActionFeedback.current = '';
             setMessage('');
             setFeedback('');
-            setIsFeedbackCorrect(false);
+            setIsFeedbackCorrect(false); // Reset feedback color
             setActiveHandIndex(0);
             
             if (gameMode === 'solo') {
@@ -543,29 +623,28 @@ export default function App() {
                 dealInitialSolo();
             } else {
                 let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
-                let tempDealerHand = { cards: [] };
+                let tempDealerHand = [];
+                let cardsToDealCount = 15;
                 
-                let cardsToDeal = [];
-                for (let i = 0; i < 15; i++) {
-                    dealCard(card => cardsToDeal.push(card));
-                }
+                const dealCountingTable = () => {
+                    if (cardsToDealCount > 0) {
+                        dealCard(card => {
+                            cardsToDeal.push(card);
+                            dealtCount++;
+                            dealCountingTable();
+                        });
+                    } else {
+                        dealCard(card => {
+                            tempDealerHand.push({ ...card, isHidden: true });
+                            setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
+                            setDealerHand({ cards: tempDealerHand });
+                            setActiveTableHandIndex(0);
+                            setGameState('ai-turn');
+                        });
+                    }
+                };
                 
-                let cardIndex = 0;
-                for (let i = 0; i < 2; i++) {
-                    for (let j = 0; j < 7; j++) {
-                        tempTableHands[j].cards.push(cardsToDeal[cardIndex++]);
-                    }
-                    if (i === 0) {
-                        tempDealerHand.cards.push(cardsToDeal[cardIndex++]);
-                    }
-                }
-                dealCard(card => {
-                    tempDealerHand.cards.push({ ...card, isHidden: true });
-                    setTableHands(tempTableHands.map(h => ({...h, ...calculateScore(h.cards)})));
-                    setDealerHand(tempDealerHand);
-                    setActiveTableHandIndex(0);
-                    setGameState('ai-turn');
-                });
+                dealCountingTable();
             }
         };
 
@@ -589,15 +668,16 @@ export default function App() {
         
         const isCorrect = actionCode === correctMove;
         
+        // Update feedback message
         if (isCorrect) {
-            setFeedback('✅');
-            setIsFeedbackCorrect(true);
+            setFeedback('✅'); // Use the green check mark emoji
+            setIsFeedbackCorrect(true); // Set true for correct feedback
             setCorrectCount(prev => prev + 1);
             setStreakCount(prev => prev + 1);
             lastActionFeedback.current = "Correct!";
         } else {
             setFeedback(`❌ Correct move: ${correctMove}`);
-            setIsFeedbackCorrect(false);
+            setIsFeedbackCorrect(false); // Set false for incorrect feedback
             setIncorrectCount(prev => prev + 1);
             setStreakCount(0);
             lastActionFeedback.current = "Incorrect.";
@@ -605,6 +685,7 @@ export default function App() {
         
         const historyItem = { text: `Hand ${currentHandRef.display}: Your move: ${actionName}. Strategy: ${correctMove}.`, correct: isCorrect };
         setHistory(prevHistory => [historyItem, ...prevHistory]);
+
 
         switch(actionCode) {
             case 'H':
@@ -618,7 +699,7 @@ export default function App() {
                     });
                 });
                 break;
-            case 'D':
+            case 'D': // LOGIC FIX 1: Correctly handle double down status
                 dealCard(card => {
                     if(!card) return;
                     handsUpdater(prevHands => {
@@ -627,18 +708,24 @@ export default function App() {
                         currentHand.cards.push(card);
                         Object.assign(currentHand, calculateScore(currentHand.cards));
                         currentHand.isDoubled = true;
-                        currentHand.status = currentHand.score > 21 ? 'bust' : 'stood';
+                        if (currentHand.score > 21) {
+                            currentHand.status = 'bust';
+                        } else {
+                            currentHand.status = 'stood';
+                        }
                         return newHands;
                     });
                 });
                 break;
-            case 'S':
+            case 'S': {
                 handsUpdater(prevHands => {
                     const newHands = JSON.parse(JSON.stringify(prevHands));
-                    newHands[handIndex].status = 'stood';
+                    const currentHand = newHands[handIndex];
+                    currentHand.status = 'stood';
                     return newHands;
                 });
                 break;
+            }
             case 'P': {
                 const handToSplit = hands[handIndex].cards;
                 const isAces = handToSplit[0].rank === 'A';
@@ -693,7 +780,6 @@ export default function App() {
     
     useEffect(() => {
         if (gameState !== 'player-turn') return;
-        if (gameMode !== 'solo') return;
         const activeHand = playerHands[activeHandIndex];
         if (activeHand && activeHand.cards.length === 1) {
             setTimeout(() => {
@@ -712,7 +798,7 @@ export default function App() {
                 });
             }, 500);
         }
-    }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard, gameMode]);
+    }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard]);
 
     useEffect(() => {
         if (gameState !== 'player-turn') {
@@ -727,9 +813,11 @@ export default function App() {
         const newHands = JSON.parse(JSON.stringify(hands));
         const activeHand = newHands[index];
 
-        if (activeHand && activeHand.cards.length >= 2 && activeHand.status === 'playing') {
-            if (activeHand.score > 21) activeHand.status = 'bust';
-            else if (activeHand.score === 21) activeHand.status = 'stood';
+        if (activeHand && activeHand.cards.length >= 2) {
+            if (activeHand.status === 'playing') {
+                if (activeHand.score > 21) activeHand.status = 'bust';
+                else if (activeHand.score === 21) activeHand.status = 'stood';
+            }
         }
         
         if (activeHand && activeHand.status !== 'playing') {
@@ -748,6 +836,7 @@ export default function App() {
                 }
             } else {
                 setActiveTableHandIndex(prev => prev + 1);
+                setGameState('ai-turn');
             }
         }
         
@@ -760,80 +849,73 @@ export default function App() {
     }, [playerHands, tableHands, gameState, activeHandIndex, playerSeat, gameMode]);
 
     useEffect(() => {
-        if (gameState !== 'ai-turn' || activeTableHandIndex >= 7) {
-            if (gameState === 'ai-turn' && activeTableHandIndex >= 7) setGameState('dealer-turn');
+        if (gameState !== 'ai-turn') return;
+
+        if (activeTableHandIndex >= 7) {
+            setGameState('dealer-turn');
             return;
         }
 
-        const playNextAiHand = () => {
-            if (activeTableHandIndex >= 7) {
-                setGameState('dealer-turn');
-                return;
-            }
+        if (activeTableHandIndex === playerSeat) {
+            setGameState('player-turn');
+            return;
+        }
 
-            if (activeTableHandIndex === playerSeat) {
-                setActiveTableHandIndex(prev => prev + 1);
-                return;
-            }
-
-            const currentHand = tableHands[activeTableHandIndex];
-            const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
-            
-            const playAiHand = (hand) => {
-                const move = getBasicStrategy(hand.cards, dealerUpCard);
-                if (move === 'S' || hand.score >= 21 || hand.cards.length >= 5) {
-                    setTableHands(prev => {
-                        const newHands = [...prev];
-                        newHands[activeTableHandIndex].status = 'stood';
-                        return newHands;
-                    });
-                    setActiveTableHandIndex(prev => prev + 1);
-                } else {
-                    dealCard(card => {
-                        if (card) {
-                            const newHandCards = [...hand.cards, card];
-                            const newHand = {...hand, cards: newHandCards, ...calculateScore(newHandCards) };
-                            setTableHands(prev => {
-                                const newHands = [...prev];
-                                newHands[activeTableHandIndex] = newHand;
-                                return newHands;
-                            });
-                            setTimeout(() => playAiHand(newHand), 150);
-                        } else {
-                             setActiveTableHandIndex(prev => prev + 1);
-                        }
-                    });
-                }
-            };
-            playAiHand(currentHand);
-        };
+        const currentHand = tableHands[activeTableHandIndex];
+        const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
         
-        const timeoutId = setTimeout(playNextAiHand, 150);
-        return () => clearTimeout(timeoutId);
+        const playAiHand = (hand) => {
+            const move = getBasicStrategy(hand.cards, dealerUpCard);
+            if (move === 'S' || hand.score >= 21) {
+                setTableHands(prev => {
+                    const newHands = [...prev];
+                    newHands[activeTableHandIndex].status = 'stood';
+                    return newHands;
+                });
+                setActiveTableHandIndex(prev => prev + 1);
+            } else {
+                dealCard(card => {
+                    if (card) {
+                        const newHandCards = [...hand.cards, card];
+                        const newHand = {...hand, cards: newHandCards, ...calculateScore(newHandCards) };
+                        setTableHands(prev => {
+                            const newHands = [...prev];
+                            newHands[activeTableHandIndex] = newHand;
+                            return newHands;
+                        });
+                        setTimeout(() => playAiHand(newHand), 300); // Reduced delay for AI
+                    }
+                });
+            }
+        };
+
+        playAiHand(currentHand);
 
     }, [gameState, activeTableHandIndex, playerSeat, tableHands, dealerHand.cards, calculateScore, dealCard]);
-    
-     useEffect(() => {
-        if (activeTableHandIndex > 0 && activeTableHandIndex !== playerSeat) {
-            setGameState('ai-turn');
-        }
-    }, [activeTableHandIndex, playerSeat]);
 
     useEffect(() => {
         if (gameState !== 'dealer-turn') return;
 
-        setDealerHand(prev => ({ ...prev, cards: prev.cards.map(c => ({...c, isHidden: false})) }));
+        setDealerHand(prev => ({
+            ...prev,
+            cards: prev.cards.map(c => ({...c, isHidden: false}))
+        }));
 
         const dealerDrawLoop = () => {
             setDealerHand(currentDealerHand => {
                 const scoreInfo = calculateScore(currentDealerHand.cards);
+                
                 if (scoreInfo.score < 17) {
                     dealCard(card => {
                         if (card) {
                             setTimeout(() => {
-                                setDealerHand(prev => ({...prev, cards: [...prev.cards, card]}));
+                                setDealerHand(prev => ({
+                                    ...prev,
+                                    cards: [...prev.cards, card],
+                                    ...calculateScore([...prev.cards, card])
+                                }));
                                 dealerDrawLoop();
-                            }, 300);
+                            }, 300); // Reduced delay for dealer
                         } else {
                             setGameState('end');
                         }
@@ -841,12 +923,15 @@ export default function App() {
                     return currentDealerHand;
                 } else {
                     setGameState('end');
-                    return {...currentDealerHand, ...scoreInfo};
+                    return currentDealerHand;
                 }
             });
         };
         
-        setTimeout(dealerDrawLoop, 300);
+        // No initial setTimeout here, as the hidden card is revealed immediately above.
+        // The loop itself handles subsequent card draws with a delay.
+        dealerDrawLoop(); 
+
     }, [gameState, calculateScore, dealCard]);
     
     useEffect(() => {
@@ -881,7 +966,8 @@ export default function App() {
                 handsToEvaluate.forEach((hand, index) => {
                     if (!hand) return;
                     const outcomeValue = hand.isDoubled ? 2 : 1;
-                    resultMessage += gameMode === 'solo' ? `Hand ${index + 1}: ` : 'Result: ';
+                    resultMessage += `Hand ${index + 1}: `;
+                    // LOGIC FIX 2: Correctly check for bust first
                     if (hand.status === 'bust') {
                         resultMessage += 'You lose (Busted). ';
                         handLosses += outcomeValue;
@@ -899,11 +985,11 @@ export default function App() {
                         pushes++;
                     }
                 });
+
+                setWinCount(prev => prev + handWins);
+                setLossCount(prev => prev + handLosses);
+                setPushCount(prev => prev + pushes);
             }
-            
-            setWinCount(prev => prev + handWins);
-            setLossCount(prev => prev + handLosses);
-            setPushCount(prev => prev + pushes);
             
             setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
             const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
@@ -921,7 +1007,7 @@ export default function App() {
 
     useEffect(() => {
         const handleKeyDown = (event) => {
-            if (showCountPrompt || showChartModal) return;
+            if (showCountPrompt) return;
 
             if (gameState === 'player-turn') {
                 if (event.key.toLowerCase() === 'a') handlePlayerAction('H', 'Hit');
@@ -938,7 +1024,7 @@ export default function App() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt, showChartModal]);
+    }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
 
     const selectMode = (mode) => {
         setGameMode(mode);
@@ -968,10 +1054,8 @@ export default function App() {
         let countFeedback = `You entered: ${val}. Actual count: ${runningCount}. `;
         if (val === runningCount) {
             countFeedback += "✅ Correct!";
-            setIsFeedbackCorrect(true);
         } else {
             countFeedback += "❌ Incorrect.";
-            setIsFeedbackCorrect(false);
         }
         setFeedback(countFeedback);
         if (pendingPlayerAction) {
@@ -987,7 +1071,7 @@ export default function App() {
         if (gameMode === 'counting' && playerSeat !== null && tableHands.length > playerSeat) {
             return tableHands[playerSeat].cards;
         }
-        return null;
+        return [];
     }, [gameMode, playerHands, activeHandIndex, playerSeat, tableHands]);
 
     const dealerUpCard = useMemo(() => {
@@ -1002,7 +1086,7 @@ export default function App() {
                 <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
                 <div className="flex space-x-4">
                     <button onClick={() => selectMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Solo Mode</button>
-                    <button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>
+                   { /*<button onClick={() => selectMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counting</button>*/}
                 </div>
             </div>
         );
@@ -1016,6 +1100,7 @@ export default function App() {
                         <div className="flex items-center gap-6">
                             <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
                         </div>
+                        {/* Basic Strategy Chart Icon */}
                         <button
                             onClick={() => setShowChartModal(true)}
                             className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
@@ -1029,15 +1114,15 @@ export default function App() {
 
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
                         <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer {dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
+                            {/* TEXT CHANGE */}
+                            <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
                             <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
-                                {showCutCardOnTable && <Card isCutCard={true} />}
                             </div>
                         </div>
 
                         <div className="text-center my-0 h-10 flex items-center justify-center">
-                            {feedback && (
+                            {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
                                 <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
                                     {feedback}
                                 </p>
@@ -1056,13 +1141,18 @@ export default function App() {
                                 ) : (
                                     <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2">
                                         {playerHands.map((hand, i) => (
-                                            <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'ring-4 ring-yellow-400' : ''}`}>
+                                            <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
                                                 <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
                                                     <div className="flex justify-center items-center gap-2">
                                                         <span>
                                                             {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
                                                             {hand.status === 'bust' ? 'Bust' : hand.display}
                                                         </span>
+                                                        {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
+                                                            <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
+                                                                SPLIT
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
@@ -1072,8 +1162,11 @@ export default function App() {
                                                     <button
                                                         onClick={dealNewGame}
                                                         disabled={gameState !== 'end'}
-                                                        className={`absolute inset-0 w-full h-full bg-transparent ${gameState === 'end' ? 'cursor-pointer' : ''}`}
-                                                    />
+                                                        className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                                    ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                    transition-all duration-300`}
+                                                    >
+                                                    </button>
                                                 )}
                                             </div>
                                         ))}
@@ -1081,62 +1174,57 @@ export default function App() {
                                 )}
                             </div>
                         ) : (
-                            <div className="text-center">
-                                {gameState === 'pre-deal' ? (
-                                     <div
-                                        onClick={dealNewGame}
-                                        className="min-h-[250px] flex items-center justify-center bg-gray-800/50 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors"
-                                    >
-                                        <p className="text-2xl font-bold text-gray-400">Tap to Deal</p>
-                                    </div>
-                                ) : (
-                                <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
-                                    {tableHands.map((hand, i) => (
-                                        <div key={i} className={`relative p-2 rounded-lg 
-                                            ${i === playerSeat ? (gameState === 'player-turn' ? 'ring-4 ring-yellow-400' : 'bg-yellow-900/50') : ''} 
-                                            ${i === activeTableHandIndex && gameState === 'ai-turn' ? 'ring-2 ring-blue-400' : ''}`}>
-                                            <h3 className="font-bold text-xs sm:text-sm text-center h-8 flex items-center justify-center">
-                                                <span className={`${i === playerSeat ? 'text-yellow-300' : 'text-gray-400'}`}>
-                                                    {i === playerSeat ? 'You' : `P${i+1}`}:
-                                                </span>
-                                                <span className="ml-1 text-white">{hand.status === 'bust' ? 'Bust' : hand.display}</span>
-                                            </h3>
-                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1">
-                                                {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                <div className="text-center">
+                                    <h2 className="text-xl font-semibold mb-2">Table Hands</h2>
+                                    <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
+                                        {tableHands.map((hand, i) => (
+                                            <div key={i} className={`relative p-2 rounded-lg ${i === playerSeat ? 'bg-yellow-400 bg-opacity-30' : ''} ${i === activeTableHandIndex && gameState === 'ai-turn' ? 'ring-2 ring-blue-400' : ''}`}>
+                                                <h3 className="font-bold text-sm text-center h-8 flex flex-col justify-center">
+                                                    {i === playerSeat ? 'You' : `Seat ${i+1}`}: {hand.status === 'bust' ? 'Bust' : hand.display}
+                                                </h3>
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-1">
+                                                    {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                                </div>
+                                                {gameMode === 'counting' && i === playerSeat && (gameState !== 'pre-deal' && gameState !== 'pre-game') && (
+                                                    <button
+                                                        onClick={dealNewGame}
+                                                        disabled={gameState !== 'end'}
+                                                        className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                                    ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                    transition-all duration-300`}
+                                                    >
+                                                    </button>
+                                                )}
                                             </div>
-                                            {i === playerSeat && gameState === 'end' && (
-                                                <button
-                                                    onClick={dealNewGame}
-                                                    className="absolute inset-0 w-full h-full bg-transparent cursor-pointer"
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                                )}
-                            </div>
                         )}
                     </div>
                     
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                        {[
-                            ['Hit', 'H'], ['Stand', 'S'], ['Double', 'D'], ['Split', 'P']
-                        ].map(([actionName, actionCode]) => (
-                            <button
-                                key={actionName}
-                                onClick={() => handlePlayerAction(actionCode, actionName)}
-                                disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
-                                    ${actionCode === 'H' && 'bg-green-500 text-white'}
-                                    ${actionCode === 'S' && 'bg-red-500 text-white'}
-                                    ${actionCode === 'D' && 'bg-orange-400 text-white'}
-                                    ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
-                            >
-                                {actionName}
-                            </button>
-                        ))}
+                            {[
+                                ['Hit', 'H'], 
+                                ['Stand', 'S'], 
+                                ['Double', 'D'], 
+                                ['Split', 'P']
+                            ].map(([actionName, actionCode]) => (
+                                <button
+                                    key={actionName}
+                                    onClick={() => handlePlayerAction(actionCode, actionName)}
+                                    disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
+                                    className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                        ${actionCode === 'H' && 'bg-green-500 text-white'}
+                                        ${actionCode === 'S' && 'bg-red-500 text-white'}
+                                        ${actionCode === 'D' && 'bg-orange-400 text-white'}
+                                        ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
+                                >
+                                    {actionName}
+                                </button>
+                            ))}
                     </div>
                 </div>
+                {/* Responsive order for History and Streak */}
                 <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0">
                     <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
                     <div className="md:hidden h-4"></div>
@@ -1154,39 +1242,69 @@ export default function App() {
             )}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
-                body { font-family: 'Nunito', sans-serif; overflow-x: hidden; }
-                .font-mono { font-family: 'Roboto Mono', monospace; }
-                @keyframes deal { from { opacity: 0; transform: translateY(-20px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
-                .animate-deal { animation: deal 0.4s ease-out forwards; }
-                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-                .streak-box { position: relative; z-index: 1; }
-                @keyframes subtle-glow { 0%, 100% { text-shadow: 0 0 6px #ffffff55; } 50% { text-shadow: 0 0 10px #ffffff88; } }
-                .animate-subtle-glow { animation: subtle-glow 2.5s ease-in-out infinite; }
-                @keyframes bright-glow { 0%, 100% { text-shadow: 0 0 8px #ffffffaa, 0 0 12px #ffffff88; } 50% { text-shadow: 0 0 16px #ffffff, 0 0 24px #ffffffaa; } }
-                .animate-bright-glow { animation: bright-glow 2s ease-in-out infinite; }
-                @keyframes pulse-fast { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
-                .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
-                @keyframes legendary {
-                    0%, 100% { text-shadow: 0 0 12px currentColor, 0 0 22px currentColor; transform: scale(1.02); }
-                    50% { text-shadow: 0 0 18px currentColor, 0 0 28px currentColor; transform: scale(1.04); }
+                body {
+                    font-family: 'Nunito', sans-serif;
                 }
-                .animate-legendary { animation: legendary 1.2s ease-in-out infinite; }
-                @keyframes super-saiyan {
-                    0%, 100% { text-shadow: 0 0 15px currentColor, 0 0 25px currentColor; transform: scale(1.03); }
-                    50% { text-shadow: 0 0 20px currentColor, 0 0 30px currentColor; transform: scale(1.06); }
+                .font-mono {
+                    font-family: 'Roboto Mono', monospace;
+                }
+                @keyframes deal {
+                    from { opacity: 0; transform: translateY(-20px) scale(0.8); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                .animate-deal { animation: deal 0.4s ease-out forwards; }
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+                @keyframes glow {
+                    0%, 100% { text-shadow: 0 0 5px currentColor; }
+                    50% { text-shadow: 0 0 10px currentColor; }
+                }
+                .animate-glow { animation: glow 2s ease-in-out infinite; }
+                @keyframes glow-strong {
+                    0%, 100% { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+                    50% { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+                }
+                .animate-glow-strong { animation: glow-strong 1.5s ease-in-out infinite; }
+                @keyframes pulse-fast {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
+                 @keyframes super-saiyan {
+                    0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
+                    50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
                 }
                 .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; }
-                @keyframes grandmaster { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-                .animate-grandmaster { background-size: 200% 200%; animation: grandmaster 3s ease-in-out infinite; }
-                @keyframes mythic {
-                    0%, 100% { text-shadow: 0 0 10px #ffc300, 0 0 20px #ff5733, 0 0 30px #c70039; }
-                    50% { text-shadow: 0 0 15px #ffc300, 0 0 25px #ff5733, 0 0 35px #c70039; transform: scale(1.02); }
+                @keyframes legendary {
+                    0%, 100% { text-shadow: 0 0 12px #00ffff, 0 0 22px #00ffff, 0 0 32px #ffffff; transform: scale(1.05); }
+                    50% { text-shadow: 0 0 22px #00ffff, 0 0 32px #ffffff, 0 0 42px #00aaff; transform: scale(1.1); }
                 }
-                .animate-mythic { animation: mythic 1.8s ease-in-out infinite; }
+                .animate-legendary { animation: legendary 1.2s ease-in-out infinite; }
+                @keyframes mastery {
+                    0%, 100% { text-shadow: 0 0 10px #ffffff, 0 0 15px #ffffff; }
+                    50% { text-shadow: 0 0 15px #ffffff, 0 0 25px #dddddd; }
+                }
+                .animate-mastery { animation: mastery 1.5s ease-in-out infinite; }
+                @keyframes grandmaster {
+                    0%, 100% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                }
+                .animate-grandmaster {
+                    background-size: 200% 200%;
+                    animation: grandmaster 3s ease-in-out infinite;
+                }
+                @keyframes mythic {
+                    0%, 100% { text-shadow: 0 0 10px #ffc300, 0 0 20px #ff5733, 0 0 30px #c70039, 0 0 40px #900c3f; }
+                    50% { text-shadow: 0 0 15px #ffc300, 0 0 25px #ff5733, 0 0 35px #c70039, 0 0 50px #900c3f; transform: scale(1.02); }
+                }
+                .animate-mythic { animation: mythic 1s ease-in-out infinite; }
                 @keyframes god-tier {
-                    0%, 100% { text-shadow: 0 0 10px #fff, 0 0 20px #e60073, 0 0 40px #e60073; }
-                    50% { text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 50px #ff4da6; }
+                    0% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
+                    50% { text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6, 0 0 60px #ff4da6, 0 0 70px #ff4da6, 0 0 80px #ff4da6; }
+                    100% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
                 }
                 .animate-god-tier { animation: god-tier 2s linear infinite; }
             `}</style>
