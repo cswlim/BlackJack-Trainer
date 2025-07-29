@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // --- HELPER FUNCTIONS & DATA ---
-  
+
 const getBasicStrategy = (playerHand, dealerUpCard) => {
     const handValue = card => {
         if (!card) return 0;
@@ -1025,7 +1025,7 @@ export default function App() {
                         </button>
                     </header>
 
-                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
+                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-around items-center flex-grow min-h-[60vh]">
                         <div className="text-center mb-2">
                             <h2 className="text-xl font-semibold mb-2">Dealer's Hand {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
                             <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
@@ -1033,7 +1033,7 @@ export default function App() {
                             </div>
                         </div>
 
-                        <div className="text-center my-0 h-10 flex items-center justify-center">
+                        <div className="text-center my-2 flex items-center justify-center min-h-[2.5rem]">
                             {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
                                 <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
                                     {feedback}
@@ -1048,7 +1048,7 @@ export default function App() {
                                         className="relative w-full min-h-[14rem] flex items-center justify-center group cursor-pointer rounded-lg transition-colors hover:bg-gray-500 hover:bg-opacity-20"
                                         onClick={dealNewGame}
                                     >
-                                        <span className="text-2xl font-bold text-gray-400 opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <span className="text-2xl font-bold text-gray-400 opacity-50 group-hover:opacity-100 transition-opacity px-12 py-6 rounded-lg">
                                             Tap to Deal
                                         </span>
                                     </div>
