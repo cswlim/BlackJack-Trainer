@@ -192,7 +192,7 @@ const StreakCounter = ({ streak }) => {
 const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
     const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
     // Hard totals from the provided chart, including 5-7 as a range
-    const hardTotals = ['5-7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
+    const hardTotals = ['7-', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
     const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
     const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As']; // Updated pairs notation
 
@@ -209,7 +209,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
             '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
             '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
-            '5-7': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+            '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
         },
         soft: {
             'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
@@ -258,7 +258,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
         }
         // Handle hard totals
         if (score >= 17) return '17+';
-        if (score >= 5 && score <= 7) return '5-7';
+        if (score >= 5 && score <= 7) return '7-';
         return `${score}`;
     }, [calculateScore]);
 
