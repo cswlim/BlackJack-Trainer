@@ -191,12 +191,10 @@ const StreakCounter = ({ streak }) => {
 };
 const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
     const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
-    // Hard totals from the provided chart, including 5-7 as a range
-    const hardTotals = ['7-', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
+    const hardTotals = ['5-7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
     const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
-    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As']; // Updated pairs notation
+    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As'];
 
-    // Strategy data matching the provided image
     const strategyData = {
         hard: {
             '17+': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
@@ -209,7 +207,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
             '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
             '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
-            '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+            '5-7': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
         },
         soft: {
             'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
@@ -229,7 +227,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             '7s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
             '6s': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
             '5s': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
-            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'], // Changed 4,4 vs 4 from P to H
+            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
             '3s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
             '2s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
         }
@@ -240,12 +238,10 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
         const { score, isSoft } = calculateScore(hand);
         const ranks = hand.map(card => card.rank);
 
-        // Handle pairs (normalize J,Q,K to 10)
         if (hand.length === 2 && ranks[0] === ranks[1]) {
             const normalizedRank = ['J', 'Q', 'K'].includes(ranks[0]) ? '10' : ranks[0];
-            return `${normalizedRank}s`; // Use 's' suffix
+            return `${normalizedRank}s`;
         }
-        // Handle soft totals
         if (isSoft) {
             if (score >= 20) return 'A,9';
             if (score === 19) return 'A,8';
@@ -256,17 +252,14 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             if (score === 14) return 'A,3';
             if (score === 13) return 'A,2';
         }
-        // Handle hard totals
         if (score >= 17) return '17+';
-        if (score >= 5 && score <= 7) return '7-';
+        if (score >= 5 && score <= 7) return '5-7';
         return `${score}`;
     }, [calculateScore]);
 
     const getDealerUpCardKeyForChart = useCallback((card) => {
         if (!card) return null;
-        // Normalize J,Q,K to 10 for dealer's up-card
         if (['J', 'Q', 'K'].includes(card.rank)) return '10';
-        if (card.rank === 'A') return 'A';
         return card.rank;
     }, []);
 
@@ -275,126 +268,62 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
 
     const getActionColorClass = (action) => {
         switch (action) {
-            case 'H': return 'bg-green-700 text-white';   // Hit: Muted Green
-            case 'S': return 'bg-red-700 text-white';     // Stand: Muted Red
-            case 'D': return 'bg-orange-700 text-white';  // Double: Muted Orange/Gold
-            case 'P': return 'bg-blue-900 text-white';    // Split: Darker Blue (Navy)
-            default: return 'bg-gray-700 text-gray-100';  // Default or unknown
+            case 'H': return 'bg-green-700 text-white';
+            case 'S': return 'bg-red-700 text-white';
+            case 'D': return 'bg-orange-700 text-white';
+            case 'P': return 'bg-blue-900 text-white';
+            default: return 'bg-gray-700 text-gray-100';
         }
     };
+
+    const renderTableSection = (title, totals, data) => (
+        <div>
+            <h3 className="text-lg font-semibold mb-2 text-yellow-300">{title}</h3>
+            <table className="w-full table-fixed border-collapse text-sm">
+                <thead>
+                    <tr className="bg-gray-700">
+                        <th className="p-1 text-center w-1/12">P</th>
+                        {dealerRanks.map(rank => <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>)}
+                    </tr>
+                </thead>
+                <tbody>
+                    {totals.slice().reverse().map(playerTotal => (
+                        <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                            <td className="p-1 text-center font-bold">{playerTotal}</td>
+                            {dealerRanks.map((dealerRank, colIndex) => {
+                                const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                const cellValue = data[playerTotal][colIndex];
+                                return (
+                                    <td key={dealerRank} className={`p-1 text-center font-semibold
+                                        ${getActionColorClass(cellValue)}
+                                        ${isHighlighted ? 'relative z-10 ring-4 ring-yellow-400 ring-offset-gray-800 ring-offset-2' : ''}`}>
+                                        {cellValue}
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
             <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-sm md:max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
                 <button
                     onClick={onClose}
-                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors z-20"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
                 <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Basic Strategy Chart</h2>
-
                 <div className="space-y-6">
-                    {/* Hard Totals */}
-                    <div>
-                        <h3 className="text-lg font-semibold mb-2 text-yellow-300">Hard Totals</h3>
-                        <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-700">
-                                    <th className="p-1 text-center w-1/12">P</th>
-                                    {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {hardTotals.slice().reverse().map(playerTotal => (
-                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
-                                        {dealerRanks.map((dealerRank, colIndex) => {
-                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
-                                            const cellValue = strategyData.hard[playerTotal][colIndex];
-                                            return (
-                                                <td key={dealerRank} className={`p-1 text-center font-semibold transition-transform
-                                                    ${getActionColorClass(cellValue)}
-                                                    ${isHighlighted ? 'relative scale-125 z-10 border-4 border-yellow-300 shadow-lg' : ''}`}>
-                                                    {cellValue}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Soft Totals */}
-                    <div>
-                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Soft Totals</h3>
-                        <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-700">
-                                    <th className="p-1 text-center w-1/12">P</th>
-                                    {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {softTotals.slice().reverse().map(playerTotal => (
-                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
-                                        {dealerRanks.map((dealerRank, colIndex) => {
-                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
-                                            const cellValue = strategyData.soft[playerTotal][colIndex];
-                                            return (
-                                                <td key={dealerRank} className={`p-1 text-center font-semibold transition-transform
-                                                    ${getActionColorClass(cellValue)}
-                                                    ${isHighlighted ? 'relative scale-125 z-10 border-4 border-yellow-300 shadow-lg' : ''}`}>
-                                                    {cellValue}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pairs */}
-                    <div>
-                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Pairs</h3>
-                        <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-700">
-                                    <th className="p-1 text-center w-1/12">P</th>
-                                    {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pairs.slice().reverse().map(playerTotal => (
-                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
-                                        {dealerRanks.map((dealerRank, colIndex) => {
-                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
-                                            const cellValue = strategyData.pairs[playerTotal][colIndex];
-                                            return (
-                                                <td key={dealerRank} className={`p-1 text-center font-semibold transition-transform
-                                                    ${getActionColorClass(cellValue)}
-                                                    ${isHighlighted ? 'relative scale-125 z-10 border-4 border-yellow-300 shadow-lg' : ''}`}>
-                                                    {cellValue}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    {renderTableSection("Hard Totals", hardTotals, strategyData.hard)}
+                    {renderTableSection("Soft Totals", softTotals, strategyData.soft)}
+                    {renderTableSection("Pairs", pairs, strategyData.pairs)}
                 </div>
             </div>
         </div>
