@@ -276,7 +276,7 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
             '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
             '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
             '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
-            '5-7': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+            '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
         },
         soft: {
             'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
