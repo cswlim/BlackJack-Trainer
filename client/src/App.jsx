@@ -232,7 +232,7 @@ const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossC
     );
 };
 
-const StreakCounter = ({ streak }) => {
+const StreakCounter = ({ streak, burstAnimClass }) => {
     if (streak < 2) return null;
 
     const getStreakClass = () => {
@@ -250,7 +250,7 @@ const StreakCounter = ({ streak }) => {
     const isCosmic = streak >= 300;
 
     return (
-        <div className={`streak-box mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getStreakClass()}`}>
+        <div className={`streak-box mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getStreakClass()} ${burstAnimClass}`}>
             <span className={`text-2xl ${isCosmic ? 'cosmic-text' : ''}`}>🔥</span>
             <span className={`text-xl font-bold ${isCosmic ? 'cosmic-text' : ''}`}>{streak} Streak!</span>
         </div>
@@ -495,7 +495,7 @@ export default function App() {
 
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
-    const [isFeedbackCorrect, setIsFeedbackCorrect] = useState(false); // New state for feedback color
+    const [isFeedbackCorrect, setIsFeedbackCorrect] = useState(false);
     const [history, setHistory] = useState([]);
     const [correctCount, setCorrectCount] = useState(0);
     const [incorrectCount, setIncorrectCount] = useState(0);
@@ -508,7 +508,15 @@ export default function App() {
     const [isActionDisabled, setIsActionDisabled] = useState(false);
     const lastActionFeedback = useRef('');
     const endOfRoundMessageSet = useRef(false);
-    const [showChartModal, setShowChartModal] = useState(false); // State for chart modal
+    const [showChartModal, setShowChartModal] = useState(false);
+
+    // State for new animations
+    const [announcement, setAnnouncement] = useState(null);
+    const [burstKey, setBurstKey] = useState(0);
+    const [burstAnimClass, setBurstAnimClass] = useState('');
+    const [washAwayKey, setWashAwayKey] = useState(0);
+    const [showWashAway, setShowWashAway] = useState(false);
+
 
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
@@ -670,18 +678,29 @@ export default function App() {
         
         const isCorrect = actionCode === correctMove;
         
-        // Update feedback message
         if (isCorrect) {
-            setFeedback('✅'); // Use the green check mark emoji
-            setIsFeedbackCorrect(true); // Set true for correct feedback
+            const newStreak = streakCount + 1;
+            setStreakCount(newStreak);
             setCorrectCount(prev => prev + 1);
-            setStreakCount(prev => prev + 1);
+            setIsFeedbackCorrect(true);
+            setFeedback('✅');
             lastActionFeedback.current = "Correct!";
+
+            if ([100, 200, 300].includes(newStreak)) {
+                setAnnouncement(newStreak);
+            } else if (newStreak === 50) {
+                setBurstKey(k => k + 1);
+            }
+            setShowWashAway(false);
         } else {
-            setFeedback(`❌ Correct move: ${correctMove}`);
-            setIsFeedbackCorrect(false); // Set false for incorrect feedback
-            setIncorrectCount(prev => prev + 1);
+            if (streakCount >= 2) {
+                setShowWashAway(true);
+                setWashAwayKey(k => k + 1);
+            }
             setStreakCount(0);
+            setIncorrectCount(prev => prev + 1);
+            setIsFeedbackCorrect(false);
+            setFeedback(`❌ Correct move: ${correctMove}`);
             lastActionFeedback.current = "Incorrect.";
         }
         
@@ -701,7 +720,7 @@ export default function App() {
                     });
                 });
                 break;
-            case 'D': // LOGIC FIX 1: Correctly handle double down status
+            case 'D':
                 dealCard(card => {
                     if(!card) return;
                     handsUpdater(prevHands => {
@@ -754,7 +773,7 @@ export default function App() {
             }
             default: break;
         }
-    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, gameMode, playerHands, playerSeat, tableHands]);
+    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, gameMode, playerHands, playerSeat, tableHands, streakCount]);
 
     const handlePlayerAction = useCallback((actionCode, actionName) => {
         if (gameMode === 'counting') {
@@ -930,8 +949,6 @@ export default function App() {
             });
         };
         
-        // No initial setTimeout here, as the hidden card is revealed immediately above.
-        // The loop itself handles subsequent card draws with a delay.
         dealerDrawLoop(); 
 
     }, [gameState, calculateScore, dealCard]);
@@ -969,7 +986,6 @@ export default function App() {
                     if (!hand) return;
                     const outcomeValue = hand.isDoubled ? 2 : 1;
                     resultMessage += `Hand ${index + 1}: `;
-                    // LOGIC FIX 2: Correctly check for bust first
                     if (hand.status === 'bust') {
                         resultMessage += 'You lose (Busted). ';
                         handLosses += outcomeValue;
@@ -1027,6 +1043,32 @@ export default function App() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
+
+    // Effect for burst animation
+    useEffect(() => {
+        if (burstKey > 0) {
+            setBurstAnimClass('animate-long-pulse-burst');
+            const timer = setTimeout(() => setBurstAnimClass(''), 1500); // Animation duration
+            return () => clearTimeout(timer);
+        }
+    }, [burstKey]);
+
+    // Effect for wash away animation
+    useEffect(() => {
+        if (showWashAway) {
+            const timer = setTimeout(() => setShowWashAway(false), 1500); // Animation duration
+            return () => clearTimeout(timer);
+        }
+    }, [washAwayKey]);
+
+    // Effect for fullscreen announcement
+    useEffect(() => {
+        if (announcement) {
+            const timer = setTimeout(() => setAnnouncement(null), 3500);
+            return () => clearTimeout(timer);
+        }
+    }, [announcement]);
+
 
     const selectMode = (mode) => {
         setGameMode(mode);
@@ -1096,13 +1138,20 @@ export default function App() {
 
     return (
         <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
+            {announcement && (
+                <div id="fullscreen-announcement" className={`is-active announce-${announcement}`}>
+                    <div className="content text-center">
+                        <h2 id="announce-number" className={`text-7xl md:text-9xl font-black number ${announcement === 300 ? 'announce-cosmic-text' : ''}`}>{announcement}</h2>
+                    </div>
+                    <button onClick={() => setAnnouncement(null)} className="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
+                </div>
+            )}
             <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
                 <div className="flex-grow">
                     <header className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-6">
                             <h1 className="text-3xl font-bold transition-colors duration-300">{gameMode === 'solo' ? 'Solo Mode' : 'Card Counting Mode'}</h1>
                         </div>
-                        {/* Basic Strategy Chart Icon */}
                         <button
                             onClick={() => setShowChartModal(true)}
                             className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
@@ -1116,7 +1165,6 @@ export default function App() {
 
                     <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
                         <div className="text-center mb-2">
-                            {/* TEXT CHANGE */}
                             <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
                             <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
                                 {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
@@ -1226,11 +1274,16 @@ export default function App() {
                             ))}
                     </div>
                 </div>
-                {/* Responsive order for History and Streak */}
                 <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0">
                     <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
                     <div className="md:hidden h-4"></div>
-                    <StreakCounter streak={streakCount} />
+                    {showWashAway ? (
+                        <div key={washAwayKey} className="mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 animate-wash-away">
+                            <span className="text-2xl">💔🥀</span><span className="text-xl font-bold text-gray-400">Streak Lost</span>
+                        </div>
+                    ) : (
+                       <StreakCounter streak={streakCount} burstAnimClass={burstAnimClass} />
+                    )}
                 </div>
             </div>
             {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
@@ -1267,6 +1320,33 @@ export default function App() {
                 }
                 .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
                 
+                /* --- One-Shot Animations --- */
+                @keyframes long-pulse-burst {
+                  0% {
+                    transform: scale(1);
+                    box-shadow: 0 0 0px 0px rgba(147, 197, 253, 0);
+                  }
+                  50% {
+                    transform: scale(1.15);
+                    box-shadow: 0 0 30px 10px rgba(147, 197, 253, 0.7); /* Blue bloom */
+                  }
+                  100% {
+                    transform: scale(1);
+                    box-shadow: 0 0 0px 0px rgba(147, 197, 253, 0);
+                  }
+                }
+                .animate-long-pulse-burst {
+                  animation: long-pulse-burst 1.5s ease-in-out forwards;
+                }
+
+                @keyframes wash-away {
+                  from { opacity: 1; transform: translateY(0); filter: blur(0); }
+                  to { opacity: 0; transform: translateY(40px); filter: blur(4px); }
+                }
+                .animate-wash-away {
+                  animation: wash-away 1.5s ease-in forwards;
+                }
+
                 /* --- Continuous Animations --- */
                 @keyframes subtle-glow {
                     0%, 100% { text-shadow: 0 0 6px #ffffff55; }
@@ -1314,7 +1394,6 @@ export default function App() {
                     color: #ede9fe;
                 }
 
-                /* NEW: Style for 150 Streak */
                 .animate-pulse-flicker {
                     animation: slow-pulse 2.5s ease-in-out infinite, energy-flicker 1.5s linear infinite;
                     color: #fef9c3;
@@ -1397,6 +1476,72 @@ export default function App() {
                 .tier-8-box .cosmic-text {
                     color: #fff;
                     animation: cosmic-text-glow 2s ease-in-out infinite alternate;
+                }
+                
+                /* --- Fullscreen Announcements --- */
+                #fullscreen-announcement {
+                  display: none;
+                  position: fixed;
+                  inset: 0;
+                  background-color: rgba(0, 0, 0, 0.8);
+                  z-index: 100;
+                  align-items: center;
+                  justify-content: center;
+                  backdrop-filter: blur(5px);
+                }
+                @keyframes announce-fade-in {
+                  from { opacity: 0; }
+                  to { opacity: 1; }
+                }
+                @keyframes announce-text-zoom {
+                  from { transform: scale(0.5); opacity: 0; }
+                  to { transform: scale(1); opacity: 1; }
+                }
+                #fullscreen-announcement.is-active {
+                  display: flex;
+                  animation: announce-fade-in 0.3s ease-out;
+                }
+                #fullscreen-announcement .content {
+                  animation: announce-text-zoom 0.7s 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+                }
+                .announce-100 .number {
+                  color: #93c5fd;
+                  text-shadow: 0 0 15px #60a5fa, 0 0 25px #3b82f6;
+                }
+                
+                @keyframes starfield {
+                  from { background-position: 0 0; }
+                  to { background-position: -10000px 5000px; }
+                }
+                .announce-200 {
+                  background-image: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png);
+                  animation: starfield 200s linear infinite;
+                }
+                .announce-200 .number {
+                  color: #d8b4fe;
+                  text-shadow: 0 0 15px #a855f7, 0 0 30px #a855f7;
+                  animation: slow-pulse 2.5s ease-in-out infinite;
+                }
+                
+                @keyframes screen-shake {
+                  0%, 100% { transform: translate(0, 0); }
+                  10%, 30%, 50%, 70%, 90% { transform: translate(-2px, 2px); }
+                  20%, 40%, 60%, 80% { transform: translate(2px, -2px); }
+                }
+                @keyframes rainbow-shift {
+                  to { background-position: 200% center; }
+                }
+                .announce-300 {
+                  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 60%), url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png), url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/twinkling.png);
+                  animation: starfield 100s linear infinite, screen-shake 0.5s linear;
+                }
+                .announce-300 .number {
+                  background-image: linear-gradient(to right, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
+                  background-size: 200% auto;
+                  -webkit-background-clip: text;
+                  background-clip: text;
+                  color: transparent;
+                  animation: rainbow-shift 3s linear infinite;
                 }
             `}</style>
         </div>
