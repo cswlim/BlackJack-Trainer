@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-//this is the most stable version so far with everything. a
+
 // --- HELPER FUNCTIONS & DATA ---
 
 const getBasicStrategy = (playerHand, dealerUpCard) => {
@@ -236,22 +236,23 @@ const StreakCounter = ({ streak }) => {
     if (streak < 2) return null;
 
     const getStreakClass = () => {
-        if (streak >= 300) return 'animate-god-tier text-white';
-        if (streak >= 250) return 'animate-mythic text-yellow-300';
-        if (streak >= 200) return 'animate-grandmaster text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500';
-        if (streak >= 150) return 'animate-mastery text-gray-200';
-        if (streak >= 100) return 'text-orange-400 animate-super-saiyan';
-        if (streak >= 75) return 'text-cyan-400 animate-legendary';
-        if (streak >= 50) return 'text-red-400 animate-pulse-fast';
-        if (streak >= 25) return 'text-yellow-400 animate-glow-strong';
-        if (streak >= 10) return 'text-yellow-300 animate-glow';
-        return 'text-white';
+        if (streak >= 300) return 'tier-8-box';
+        if (streak >= 250) return 'animate-fast-pulse-ring';
+        if (streak >= 200) return 'animate-slow-pulse-ring';
+        if (streak >= 150) return 'animate-pulse-flicker';
+        if (streak >= 100) return 'animate-energy-flicker';
+        if (streak >= 50) return 'animate-blue-aura';
+        if (streak >= 25) return 'animate-bright-glow';
+        if (streak >= 10) return 'animate-subtle-glow';
+        return '';
     };
+    
+    const isCosmic = streak >= 300;
 
     return (
-        <div className={`mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 flex items-center justify-center gap-2 ${getStreakClass()}`}>
-            <span className="text-2xl">🔥</span>
-            <span className="text-xl font-bold">{streak} Streak!</span>
+        <div className={`streak-box mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getStreakClass()}`}>
+            <span className={`text-2xl ${isCosmic ? 'cosmic-text' : ''}`}>🔥</span>
+            <span className={`text-xl font-bold ${isCosmic ? 'cosmic-text' : ''}`}>{streak} Streak!</span>
         </div>
     );
 };
@@ -664,6 +665,7 @@ export default function App() {
 
         const currentHandRef = hands[handIndex];
         const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
+        
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
         
         const isCorrect = actionCode === correctMove;
@@ -1163,8 +1165,8 @@ export default function App() {
                                                         onClick={dealNewGame}
                                                         disabled={gameState !== 'end'}
                                                         className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
-                                                                    ${gameState === 'end' ? 'cursor-pointer' : ''}
-                                                                    transition-all duration-300`}
+                                                                ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                transition-all duration-300`}
                                                     >
                                                     </button>
                                                 )}
@@ -1190,8 +1192,8 @@ export default function App() {
                                                         onClick={dealNewGame}
                                                         disabled={gameState !== 'end'}
                                                         className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
-                                                                    ${gameState === 'end' ? 'cursor-pointer' : ''}
-                                                                    transition-all duration-300`}
+                                                                ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                                transition-all duration-300`}
                                                     >
                                                     </button>
                                                 )}
@@ -1199,7 +1201,7 @@ export default function App() {
                                         ))}
                                     </div>
                                 </div>
-                        )}
+                            )}
                     </div>
                     
                     <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
@@ -1242,11 +1244,17 @@ export default function App() {
             )}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
+                
                 body {
                     font-family: 'Nunito', sans-serif;
+                    overflow-x: hidden;
                 }
                 .font-mono {
                     font-family: 'Roboto Mono', monospace;
+                }
+                .streak-box {
+                    position: relative;
+                    z-index: 1;
                 }
                 @keyframes deal {
                     from { opacity: 0; transform: translateY(-20px) scale(0.8); }
@@ -1258,55 +1266,138 @@ export default function App() {
                     to { opacity: 1; }
                 }
                 .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-                @keyframes glow {
-                    0%, 100% { text-shadow: 0 0 5px currentColor; }
-                    50% { text-shadow: 0 0 10px currentColor; }
+                
+                /* --- Continuous Animations --- */
+                @keyframes subtle-glow {
+                    0%, 100% { text-shadow: 0 0 6px #ffffff55; }
+                    50% { text-shadow: 0 0 10px #ffffff88; }
                 }
-                .animate-glow { animation: glow 2s ease-in-out infinite; }
-                @keyframes glow-strong {
-                    0%, 100% { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
-                    50% { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+                .animate-subtle-glow {
+                    animation: subtle-glow 2.5s ease-in-out infinite;
                 }
-                .animate-glow-strong { animation: glow-strong 1.5s ease-in-out infinite; }
-                @keyframes pulse-fast {
+
+                @keyframes bright-glow {
+                    0%, 100% { text-shadow: 0 0 8px #ffffffaa, 0 0 12px #ffffff88; }
+                    50% { text-shadow: 0 0 16px #ffffff, 0 0 24px #ffffffaa; }
+                }
+                .animate-bright-glow {
+                    animation: bright-glow 2s ease-in-out infinite;
+                }
+
+                @keyframes blue-aura {
+                    0%, 100% { text-shadow: 0 0 10px #60a5fa, 0 0 20px #3b82f6; }
+                    50% { text-shadow: 0 0 15px #93c5fd, 0 0 30px #60a5fa; }
+                }
+                .animate-blue-aura {
+                    animation: blue-aura 2s ease-in-out infinite;
+                    color: #dbeafe;
+                }
+
+                @keyframes energy-flicker {
+                    0%   { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
+                    25%  { text-shadow: 0 0 12px #fde047, 0 0 25px #facc15; }
+                    50%  { text-shadow: 0 0 10px #fde047, 0 0 22px #facc15; }
+                    75%  { text-shadow: 0 0 14px #fde047, 0 0 28px #facc15; }
+                    100% { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
+                }
+                .animate-energy-flicker {
+                    animation: energy-flicker 1.5s linear infinite;
+                    color: #fef9c3;
+                }
+
+                @keyframes slow-pulse {
                     0%, 100% { transform: scale(1); }
                     50% { transform: scale(1.05); }
                 }
-                .animate-pulse-fast { animation: pulse-fast 1s ease-in-out infinite; }
-                 @keyframes super-saiyan {
-                    0%, 100% { text-shadow: 0 0 15px #ff8c00, 0 0 25px #ff8c00, 0 0 40px #ffae42; transform: scale(1); }
-                    50% { text-shadow: 0 0 25px #ffae42, 0 0 40px #ffcc00, 0 0 60px #ffdd57; transform: scale(1.1); }
+                .animate-slow-pulse {
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                    color: #ede9fe;
                 }
-                .animate-super-saiyan { animation: super-saiyan 0.8s ease-in-out infinite; }
-                @keyframes legendary {
-                    0%, 100% { text-shadow: 0 0 12px #00ffff, 0 0 22px #00ffff, 0 0 32px #ffffff; transform: scale(1.05); }
-                    50% { text-shadow: 0 0 22px #00ffff, 0 0 32px #ffffff, 0 0 42px #00aaff; transform: scale(1.1); }
+
+                /* NEW: Style for 150 Streak */
+                .animate-pulse-flicker {
+                    animation: slow-pulse 2.5s ease-in-out infinite, energy-flicker 1.5s linear infinite;
+                    color: #fef9c3;
                 }
-                .animate-legendary { animation: legendary 1.2s ease-in-out infinite; }
-                @keyframes mastery {
-                    0%, 100% { text-shadow: 0 0 10px #ffffff, 0 0 15px #ffffff; }
-                    50% { text-shadow: 0 0 15px #ffffff, 0 0 25px #dddddd; }
+
+                @keyframes ring-glow-rose {
+                    from { box-shadow: 0 0 10px 0px #fecdd3, inset 0 0 10px 0px #fecdd3; }
+                    to { box-shadow: 0 0 20px 5px #fecdd3, inset 0 0 20px 2px #fecdd3; }
                 }
-                .animate-mastery { animation: mastery 1.5s ease-in-out infinite; }
-                @keyframes grandmaster {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
+                .animate-slow-pulse-ring {
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                    color: #fecdd3;
+                    text-shadow: 0 0 12px #fecdd3;
                 }
-                .animate-grandmaster {
-                    background-size: 200% 200%;
-                    animation: grandmaster 3s ease-in-out infinite;
+                .animate-slow-pulse-ring::before {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 1rem;
+                    z-index: -1;
+                    animation: ring-glow-rose 2.5s ease-in-out infinite alternate;
                 }
-                @keyframes mythic {
-                    0%, 100% { text-shadow: 0 0 10px #ffc300, 0 0 20px #ff5733, 0 0 30px #c70039, 0 0 40px #900c3f; }
-                    50% { text-shadow: 0 0 15px #ffc300, 0 0 25px #ff5733, 0 0 35px #c70039, 0 0 50px #900c3f; transform: scale(1.02); }
+
+                @keyframes fast-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.08); }
                 }
-                .animate-mythic { animation: mythic 1s ease-in-out infinite; }
-                @keyframes god-tier {
-                    0% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
-                    50% { text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6, 0 0 60px #ff4da6, 0 0 70px #ff4da6, 0 0 80px #ff4da6; }
-                    100% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073, 0 0 50px #e60073, 0 0 60px #e60073, 0 0 70px #e60073; }
+                @keyframes text-glow-red {
+                    from { text-shadow: 0 0 10px #fca5a5, 0 0 20px #ef4444; }
+                    to { text-shadow: 0 0 20px #fca5a5, 0 0 30px #ef4444, 0 0 40px #ef4444; }
                 }
-                .animate-god-tier { animation: god-tier 2s linear infinite; }
+                .animate-fast-pulse-ring {
+                    animation: fast-pulse 1s ease-in-out infinite, text-glow-red 1.5s ease-in-out infinite alternate;
+                    color: #fca5a5;
+                }
+                .animate-fast-pulse-ring::before {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 1rem;
+                    z-index: -1;
+                    animation: ring-glow-rose 1s ease-in-out infinite alternate;
+                }
+
+                @keyframes cosmic-border-shift {
+                    to { background-position: 200% center; }
+                }
+                @keyframes cosmic-text-glow {
+                    from { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff; }
+                    to { text-shadow: 0 0 20px #fff, 0 0 30px #60a5fa, 0 0 40px #60a5fa; }
+                }
+                @keyframes aura-ring-pulse {
+                    from { box-shadow: 0 0 20px 5px #ffffff88; opacity: 0.7; }
+                    to { box-shadow: 0 0 35px 15px #ffffff00; opacity: 1; }
+                }
+                .tier-8-box {
+                    background-color: #1e1b4b;
+                    border: 4px solid transparent;
+                    background-clip: padding-box;
+                    position: relative;
+                }
+                .tier-8-box::before {
+                    content: '';
+                    position: absolute;
+                    top: -4px; bottom: -4px; left: -4px; right: -4px;
+                    background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
+                    background-size: 200% 100%;
+                    border-radius: 1rem;
+                    animation: cosmic-border-shift 4s linear infinite;
+                    z-index: -1;
+                }
+                .tier-8-box::after {
+                    content: '';
+                    position: absolute;
+                    inset: -10px;
+                    border-radius: 1.25rem;
+                    z-index: -2;
+                    animation: aura-ring-pulse 2s ease-in-out infinite alternate;
+                }
+                .tier-8-box .cosmic-text {
+                    color: #fff;
+                    animation: cosmic-text-glow 2s ease-in-out infinite alternate;
+                }
             `}</style>
         </div>
     );
