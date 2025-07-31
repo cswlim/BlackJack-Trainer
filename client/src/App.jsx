@@ -11,6 +11,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 const BlackjackCounter = ({ onGoBack }) => {
     // --- STATE MANAGEMENT ---
+    const [numDecks, setNumDecks] = useState(8);
     const [runningCount, setRunningCount] = useState(0);
     const [cardsPlayed, setCardsPlayed] = useState(0);
     const [lowCardsPlayed, setLowCardsPlayed] = useState(0);
@@ -22,21 +23,42 @@ const BlackjackCounter = ({ onGoBack }) => {
     const chartCanvasRef = useRef(null);
     const chartInstanceRef = useRef(null);
 
-    // --- CONSTANTS ---
-    const TOTAL_DECKS = 8;
-    const CARDS_PER_DECK = 52;
-    const TOTAL_CARDS = TOTAL_DECKS * CARDS_PER_DECK;
-    const INITIAL_LOW_CARDS = 5 * 4 * TOTAL_DECKS; // 2,3,4,5,6
-    const INITIAL_NEUTRAL_CARDS = 3 * 4 * TOTAL_DECKS; // 7,8,9
-    const INITIAL_HIGH_CARDS = 5 * 4 * TOTAL_DECKS; // 10,J,Q,K,A
+    // --- DERIVED CONSTANTS ---
+    // These values are recalculated whenever the number of decks changes.
+    const { TOTAL_CARDS, INITIAL_LOW_CARDS, INITIAL_NEUTRAL_CARDS, INITIAL_HIGH_CARDS } = useMemo(() => {
+        const CARDS_PER_DECK = 52;
+        return {
+            TOTAL_CARDS: numDecks * CARDS_PER_DECK,
+            INITIAL_LOW_CARDS: 5 * 4 * numDecks, // 2,3,4,5,6
+            INITIAL_NEUTRAL_CARDS: 3 * 4 * numDecks, // 7,8,9
+            INITIAL_HIGH_CARDS: 5 * 4 * numDecks, // 10,J,Q,K,A
+        };
+    }, [numDecks]);
+
 
     // --- CORE LOGIC ---
     const calculateTrueCount = useCallback(() => {
+        const CARDS_PER_DECK = 52;
         const cardsRemaining = TOTAL_CARDS - cardsPlayed;
         if (cardsRemaining === 0) return 0;
         const decksRemaining = cardsRemaining / CARDS_PER_DECK;
         return runningCount / decksRemaining;
-    }, [runningCount, cardsPlayed]);
+    }, [runningCount, cardsPlayed, TOTAL_CARDS]);
+    
+    const resetAll = useCallback(() => {
+        setRunningCount(0);
+        setCardsPlayed(0);
+        setLowCardsPlayed(0);
+        setNeutralCardsPlayed(0);
+        setHighCardsPlayed(0);
+        setTrendData([]);
+        console.log("Counter and history have been reset.");
+    }, []);
+
+    const handleDeckChange = (newDeckCount) => {
+        setNumDecks(newDeckCount);
+        resetAll(); // Reset all stats when the number of decks changes
+    };
 
     const handleCard = (value) => {
         if (cardsPlayed >= TOTAL_CARDS) {
@@ -45,8 +67,6 @@ const BlackjackCounter = ({ onGoBack }) => {
         }
 
         const newTrendData = [...trendData];
-        let newRunningCount = runningCount + value;
-        let newCardsPlayed = cardsPlayed + 1;
         
         // Store previous state for undo
         newTrendData.push({
@@ -59,8 +79,8 @@ const BlackjackCounter = ({ onGoBack }) => {
             highCardsPlayedBefore: highCardsPlayed,
         });
 
-        setRunningCount(newRunningCount);
-        setCardsPlayed(newCardsPlayed);
+        setRunningCount(prev => prev + value);
+        setCardsPlayed(prev => prev + 1);
         setTrendData(newTrendData);
 
         if (value === 1) setLowCardsPlayed(p => p + 1);
@@ -84,16 +104,6 @@ const BlackjackCounter = ({ onGoBack }) => {
         setNeutralCardsPlayed(lastAction.neutralCardsPlayedBefore);
         setHighCardsPlayed(lastAction.highCardsPlayedBefore);
         setTrendData(newTrendData);
-    };
-
-    const resetAll = () => {
-        setRunningCount(0);
-        setCardsPlayed(0);
-        setLowCardsPlayed(0);
-        setNeutralCardsPlayed(0);
-        setHighCardsPlayed(0);
-        setTrendData([]);
-        console.log("Counter and history have been reset.");
     };
 
     // --- CHART LOGIC ---
@@ -148,7 +158,9 @@ const BlackjackCounter = ({ onGoBack }) => {
 
         // Cleanup function to remove the script and destroy the chart
         return () => {
-            document.body.removeChild(script);
+            if (document.body.contains(script)) {
+                document.body.removeChild(script);
+            }
             if (chartInstanceRef.current) {
                 chartInstanceRef.current.destroy();
             }
@@ -226,6 +238,48 @@ const BlackjackCounter = ({ onGoBack }) => {
                   margin-bottom: 1rem;
                   color: #ffffff;
                 }
+                /* Deck Selector Styles */
+                .bjc-deck-selector {
+                    background-color: #1c1c1e;
+                    border-radius: 20px;
+                    padding: 1rem;
+                    margin-bottom: 1.5rem;
+                    width: 100%;
+                    max-width: 380px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                }
+                .bjc-deck-selector h4 {
+                    margin: 0 0 0.75rem 0;
+                    font-size: 1rem;
+                    color: #8e8e93;
+                    text-transform: uppercase;
+                }
+                .bjc-deck-selector .bjc-deck-buttons {
+                    display: flex;
+                    justify-content: space-around;
+                    gap: 0.5rem;
+                }
+                .bjc-deck-button {
+                    flex-grow: 1;
+                    padding: 0.5rem;
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    border: 2px solid #3a3a3c;
+                    border-radius: 10px;
+                    background-color: transparent;
+                    color: #e0e0e0;
+                    cursor: pointer;
+                    transition: background-color 0.2s, border-color 0.2s;
+                }
+                .bjc-deck-button:hover {
+                    background-color: #3a3a3c;
+                }
+                .bjc-deck-button.active {
+                    background-color: #007aff;
+                    border-color: #007aff;
+                    color: white;
+                }
+
                 .bjc-counter-display {
                   background-color: #1c1c1e;
                   border-radius: 20px;
@@ -333,6 +387,21 @@ const BlackjackCounter = ({ onGoBack }) => {
                     <button className="bjc-utility-button-top bjc-reset-button" onClick={resetAll}>Reset</button>
                 </div>
                 <div className="bjc-title">Advanced Blackjack Counter</div>
+
+                <div className="bjc-deck-selector">
+                    <h4>Decks in Shoe</h4>
+                    <div className="bjc-deck-buttons">
+                        {[1, 2, 4, 6, 8].map(d => (
+                            <button
+                                key={d}
+                                className={`bjc-deck-button ${numDecks === d ? 'active' : ''}`}
+                                onClick={() => handleDeckChange(d)}
+                            >
+                                {d}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
                 <div className="bjc-counter-display">
                     <div className="bjc-counter-label">Running Count</div>
@@ -1486,171 +1555,142 @@ const BlackjackTrainer = ({ onGoBack }) => {
     }, [dealerHand.cards]);
 
     return (
-        <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
-            {announcement && (
-                <div id="fullscreen-announcement" className={`is-active announce-${announcement}`}>
-                    <div className="content text-center">
-                        <h2 id="announce-number" className={`text-7xl md:text-9xl font-black number ${announcement === 300 ? 'announce-cosmic-text' : ''}`}>{announcement}</h2>
-                    </div>
-                    <button onClick={() => setAnnouncement(null)} className="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
-                </div>
-            )}
-            <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
-                <div className="flex-grow">
-                    <header className="flex justify-between items-center mb-4">
-                        <div className="flex items-center gap-6">
-                            <button onClick={onGoBack} className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-600 transition">
-                                &larr; Back
-                            </button>
-                            <h1 className="text-3xl font-bold transition-colors duration-300">Solo Mode</h1>
+        <>
+            <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
+                {announcement && (
+                    <div id="fullscreen-announcement" className={`is-active announce-${announcement}`}>
+                        <div className="content text-center">
+                            <h2 id="announce-number" className={`text-7xl md:text-9xl font-black number ${announcement === 300 ? 'announce-cosmic-text' : ''}`}>{announcement}</h2>
                         </div>
-                        <button
-                            onClick={() => setShowChartModal(true)}
-                            className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
-                            title="View Basic Strategy Chart"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                        </button>
-                    </header>
+                        <button onClick={() => setAnnouncement(null)} className="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
+                    </div>
+                )}
+                <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
+                    <div className="flex-grow">
+                        <header className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-6">
+                                <button onClick={onGoBack} className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-600 transition">
+                                    &larr; Back
+                                </button>
+                                <h1 className="text-3xl font-bold transition-colors duration-300">Strategy Trainer</h1>
+                            </div>
+                            <button
+                                onClick={() => setShowChartModal(true)}
+                                className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
+                                title="View Basic Strategy Chart"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </button>
+                        </header>
 
-                    <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
-                        <div className="text-center mb-2">
-                            <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
-                            <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
-                                {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
+                        <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
+                            <div className="text-center mb-2">
+                                <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
+                                <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
+                                    {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
+                                </div>
+                            </div>
+
+                            <div className="text-center my-0 h-10 flex items-center justify-center">
+                                {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
+                                    <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                                        {feedback}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="text-center">
+                                {(playerHands.length === 0 && (gameState === 'pre-deal' || gameState === 'pre-game')) ? (
+                                    <div
+                                        onClick={dealNewGame}
+                                        className="min-h-[250px] flex items-center justify-center bg-gray-800/50 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        <p className="text-2xl font-bold text-gray-400">Tap to Deal</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2">
+                                        {playerHands.map((hand, i) => (
+                                            <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
+                                                <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
+                                                    <div className="flex justify-center items-center gap-2">
+                                                        <span>
+                                                            {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
+                                                            {hand.status === 'bust' ? 'Bust' : hand.display}
+                                                        </span>
+                                                        {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
+                                                            <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
+                                                                SPLIT
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
+                                                    {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                                </div>
+                                                {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
+                                                    <button
+                                                        onClick={dealNewGame}
+                                                        disabled={gameState !== 'end'}
+                                                        className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                            ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                            transition-all duration-300`}
+                                                    >
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
+                                    {[
+                                        ['Hit', 'H'], 
+                                        ['Stand', 'S'], 
+                                        ['Double', 'D'], 
+                                        ['Split', 'P']
+                                    ].map(([actionName, actionCode]) => (
+                                        <button
+                                            key={actionName}
+                                            onClick={() => handlePlayerAction(actionCode, actionName)}
+                                            disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
+                                            className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                                ${actionCode === 'H' && 'bg-green-500 text-white'}
+                                                ${actionCode === 'S' && 'bg-red-500 text-white'}
+                                                ${actionCode === 'D' && 'bg-orange-400 text-white'}
+                                                ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
+                                        >
+                                            {actionName}
+                                        </button>
+                                    ))}
                             </div>
                         </div>
-
-                        <div className="text-center my-0 h-10 flex items-center justify-center">
-                            {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
-                                <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                                    {feedback}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="text-center">
-                            {(playerHands.length === 0 && (gameState === 'pre-deal' || gameState === 'pre-game')) ? (
-                                <div
-                                    onClick={dealNewGame}
-                                    className="min-h-[250px] flex items-center justify-center bg-gray-800/50 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors"
-                                >
-                                    <p className="text-2xl font-bold text-gray-400">Tap to Deal</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2">
-                                    {playerHands.map((hand, i) => (
-                                        <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
-                                            <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
-                                                <div className="flex justify-center items-center gap-2">
-                                                    <span>
-                                                        {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
-                                                        {hand.status === 'bust' ? 'Bust' : hand.display}
-                                                    </span>
-                                                    {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
-                                                        <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
-                                                            SPLIT
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
-                                                {hand.cards.map((card, j) => <Card key={j} {...card} />)}
-                                            </div>
-                                            {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
-                                                <button
-                                                    onClick={dealNewGame}
-                                                    disabled={gameState !== 'end'}
-                                                    className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
-                                                        ${gameState === 'end' ? 'cursor-pointer' : ''}
-                                                        transition-all duration-300`}
-                                                >
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        
-                        <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
-                                {[
-                                    ['Hit', 'H'], 
-                                    ['Stand', 'S'], 
-                                    ['Double', 'D'], 
-                                    ['Split', 'P']
-                                ].map(([actionName, actionCode]) => (
-                                    <button
-                                        key={actionName}
-                                        onClick={() => handlePlayerAction(actionCode, actionName)}
-                                        disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
-                                        className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
-                                            ${actionCode === 'H' && 'bg-green-500 text-white'}
-                                            ${actionCode === 'S' && 'bg-red-500 text-white'}
-                                            ${actionCode === 'D' && 'bg-orange-400 text-white'}
-                                            ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
-                                    >
-                                        {actionName}
-                                    </button>
-                                ))}
-                        </div>
+                    </div>
+                    <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0">
+                        <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
+                        <div className="md:hidden h-4"></div>
+                        {showWashAway ? (
+                            <div key={washAwayKey} className="mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 animate-wash-away">
+                                <span className="text-2xl">💔🥀</span><span className="text-xl font-bold text-gray-400">Streak Lost</span>
+                            </div>
+                        ) : (
+                           <StreakCounter streak={streakCount} burstAnimClass={burstAnimClass} />
+                        )}
                     </div>
                 </div>
-                <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0">
-                    <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
-                    <div className="md:hidden h-4"></div>
-                    {showWashAway ? (
-                        <div key={washAwayKey} className="mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 animate-wash-away">
-                            <span className="text-2xl">💔🥀</span><span className="text-xl font-bold text-gray-400">Streak Lost</span>
-                        </div>
-                    ) : (
-                       <StreakCounter streak={streakCount} burstAnimClass={burstAnimClass} />
-                    )}
-                </div>
+                {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
+                {showChartModal && (
+                    <BasicStrategyChartModal 
+                        playerHand={activePlayerHand} 
+                        dealerUpCard={dealerUpCard} 
+                        onClose={() => setShowChartModal(false)}
+                        calculateScore={calculateScore}
+                    />
+                )}
             </div>
-            {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
-            {showChartModal && (
-                <BasicStrategyChartModal 
-                    playerHand={activePlayerHand} 
-                    dealerUpCard={dealerUpCard} 
-                    onClose={() => setShowChartModal(false)}
-                    calculateScore={calculateScore}
-                />
-            )}
-        </div>
-    );
-}
-
-
-// ===================================================================================
-// --- 3. MAIN APP COMPONENT (Router) ---
-// ===================================================================================
-
-export default function App() {
-    const [gameMode, setGameMode] = useState(null); // 'solo', 'counting', or null
-
-    if (gameMode === 'solo') {
-        return <BlackjackTrainer onGoBack={() => setGameMode(null)} />;
-    }
-
-    if (gameMode === 'counting') {
-        return <BlackjackCounter onGoBack={() => setGameMode(null)} />;
-    }
-
-    // Default view: Mode Selection
-    return (
-        <>
-            <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-900`}>
-                <h1 className="text-4xl font-bold text-gray-100 transition-colors duration-300">Blackjack Trainer</h1>
-                <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
-                <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                    <button onClick={() => setGameMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Strategy Trainer</button>
-                    <button onClick={() => setGameMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counter</button>
-                </div>
-            </div>
-            {/* Global styles needed for the trainer animations */}
+            {/* Styles for the Blackjack Trainer are now self-contained */}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                 
@@ -1904,3 +1944,30 @@ export default function App() {
     );
 }
 
+// ===================================================================================
+// --- 3. MAIN APP COMPONENT (Router) ---
+// ===================================================================================
+
+export default function App() {
+    const [gameMode, setGameMode] = useState(null); // 'solo', 'counting', or null
+
+    if (gameMode === 'solo') {
+        return <BlackjackTrainer onGoBack={() => setGameMode(null)} />;
+    }
+
+    if (gameMode === 'counting') {
+        return <BlackjackCounter onGoBack={() => setGameMode(null)} />;
+    }
+
+    // Default view: Mode Selection
+    return (
+        <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-900`}>
+            <h1 className="text-4xl font-bold text-gray-100 transition-colors duration-300">Blackjack Trainer</h1>
+            <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
+            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <button onClick={() => setGameMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Strategy Trainer</button>
+                <button onClick={() => setGameMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counter</button>
+            </div>
+        </div>
+    );
+}
