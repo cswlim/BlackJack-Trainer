@@ -1603,7 +1603,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     <div className="md:hidden h-4"></div>
                     {showWashAway ? (
                         <div key={washAwayKey} className="mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 animate-wash-away">
-                            <span className="text-2xl">�🥀</span><span className="text-xl font-bold text-gray-400">Streak Lost</span>
+                            <span className="text-2xl">💔🥀</span><span className="text-xl font-bold text-gray-400">Streak Lost</span>
                         </div>
                     ) : (
                        <StreakCounter streak={streakCount} burstAnimClass={burstAnimClass} />
