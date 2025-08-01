@@ -879,7 +879,7 @@ const BlackjackCounter = ({ onGoBack }) => {
                   text-align: left;
                 }
                 .bjc-stat-item { display: flex; flex-direction: column; }
-                .bjc-stat-value { font-size: 1.5rem; font-weight: 600; color: #ffffff; }
+                .bjc-stat-value { font-size: 1.2rem; font-weight: 600; color: #ffffff; }
                 .bjc-stat-label { font-size: 0.8rem; color: #8e8e93; text-transform: uppercase; }
                 .bjc-data-section {
                   width: 100%;
@@ -948,9 +948,9 @@ const BlackjackCounter = ({ onGoBack }) => {
                 <div className="bjc-stats-container">
                     <div className="bjc-stats-grid">
                         <h4>Remaining Cards</h4>
-                        <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_LOW_CARDS - lowCardsPlayed}</div><div className="bjc-stat-label">Low (2-6)</div></div>
-                        <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_NEUTRAL_CARDS - neutralCardsPlayed}</div><div className="bjc-stat-label">Neutral (7-9)</div></div>
-                        <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_HIGH_CARDS - highCardsPlayed}</div><div className="bjc-stat-label">High (10-A)</div></div>
+                        <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_LOW_CARDS - lowCardsPlayed}/{INITIAL_LOW_CARDS}</div><div className="bjc-stat-label">Low (2-6)</div></div>
+                        <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_NEUTRAL_CARDS - neutralCardsPlayed}/{INITIAL_NEUTRAL_CARDS}</div><div className="bjc-stat-label">Neutral (7-9)</div></div>
+                        <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_HIGH_CARDS - highCardsPlayed}/{INITIAL_HIGH_CARDS}</div><div className="bjc-stat-label">High (10-A)</div></div>
                     </div>
                     <div className="bjc-stats-grid two-col">
                         <h4>Shoe Stats</h4>
