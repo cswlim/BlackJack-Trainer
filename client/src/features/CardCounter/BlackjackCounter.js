@@ -12,10 +12,12 @@ const BlackjackCounter = ({ onGoBack }) => {
     const [cardsPlayedByRank, setCardsPlayedByRank] = useState({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
     const [history, setHistory] = useState([]);
     const [showDeckSelector, setShowDeckSelector] = useState(false);
-    const [betUnit, setBetUnit] = useState(10);
+    const [tableMinBet, setTableMinBet] = useState(10); // Renamed from betUnit
     const [activeKey, setActiveKey] = useState(null); // For keyboard feedback
 
     // --- REFS ---
+    const chartCanvasRef = useRef(null);
+    const chartInstanceRef = useRef(null);
     const deckSelectorRef = useRef(null);
 
     // --- DERIVED CONSTANTS & CALCULATIONS ---
@@ -75,25 +77,17 @@ const BlackjackCounter = ({ onGoBack }) => {
     }, [history]);
 
     // --- BET SPREAD LOGIC ---
-    const recommendedBet = useMemo(() => {
-        // This is a simplified Kelly Criterion approach for card counting.
-        // The formula is (True Count - 1) * Bet Unit, which sizes the bet according to the player's advantage.
-        if (trueCount <= 1) {
-            return betUnit; // No advantage, bet the table minimum.
+    const { recommendedBet, advantage } = useMemo(() => {
+        const playerAdvantage = (trueCount - 1) * 0.005;
+
+        if (playerAdvantage <= 0) {
+            return { recommendedBet: 0, advantage: 0 }; // No advantage, don't bet.
         }
         
-        const betAmount = (trueCount - 1) * betUnit;
+        const betAmount = (trueCount - 1) * tableMinBet;
         
-        // The bet should never be less than the minimum.
-        return Math.max(betUnit, betAmount);
-    }, [trueCount, betUnit]);
-
-    const recommendedBankroll = useMemo(() => {
-        // A common rule of thumb is to have a bankroll of 100 times your maximum bet.
-        // We'll estimate a reasonable max bet of 12 units for this calculation.
-        const maxBet = 12 * betUnit;
-        return maxBet * 100;
-    }, [betUnit]);
+        return { recommendedBet: Math.max(tableMinBet, betAmount), advantage: playerAdvantage };
+    }, [trueCount, tableMinBet]);
 
     // --- PLAYING DEVIATIONS (ILLUSTRIOUS 18) ---
     const playingDeviations = useMemo(() => {
@@ -166,6 +160,77 @@ const BlackjackCounter = ({ onGoBack }) => {
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [handleCard, undoLastAction]);
+
+    // --- Chart Logic ---
+    useEffect(() => {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        script.async = true;
+        
+        script.onload = () => {
+            if (chartCanvasRef.current && window.Chart) {
+                const chartContext = chartCanvasRef.current.getContext('2d');
+                chartInstanceRef.current = new window.Chart(chartContext, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Running Count',
+                            data: [],
+                            borderColor: '#ffffff',
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            pointRadius: 0
+                        }, {
+                            label: 'True Count',
+                            data: [],
+                            borderColor: '#34c759',
+                            backgroundColor: 'rgba(52, 199, 89, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        animation: { duration: 0 },
+                        scales: {
+                            y: { beginAtZero: false, ticks: { color: '#8e8e93' }, grid: { color: '#3a3a3c' } },
+                            x: { ticks: { color: '#8e8e93', maxTicksLimit: 10 }, grid: { display: false } }
+                        },
+                        plugins: {
+                            legend: { labels: { color: '#e0e0e0' } }
+                        }
+                    }
+                });
+            }
+        };
+
+        document.body.appendChild(script);
+
+        return () => {
+            if (document.body.contains(script)) {
+                document.body.removeChild(script);
+            }
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (chartInstanceRef.current) {
+            const currentTrueCount = calculateTrueCount();
+            const allData = [...history, { rc: runningCount, tc: currentTrueCount }];
+            
+            chartInstanceRef.current.data.labels = allData.map((_, index) => index);
+            chartInstanceRef.current.data.datasets[0].data = allData.map(d => d.rc);
+            chartInstanceRef.current.data.datasets[1].data = allData.map(d => d.tc);
+            chartInstanceRef.current.update('none');
+        }
+    }, [runningCount, history, calculateTrueCount]);
 
     const trueCountColor = trueCount >= 2 ? '#34c759' : trueCount <= -1 ? '#ff3b30' : '#e0e0e0';
     const cardRanks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T'];
@@ -278,6 +343,7 @@ const BlackjackCounter = ({ onGoBack }) => {
                     text-align: center;
                 }
                 .bjc-bet-value { font-size: 2.5rem; font-weight: bold; color: #34c759; }
+                .bjc-bet-value.no-bet { color: #ff443a; }
 
                 .bjc-card-input { grid-column: 1 / -1; }
                 .bjc-card-keypad {
@@ -332,9 +398,6 @@ const BlackjackCounter = ({ onGoBack }) => {
 
                 .bjc-bankroll-panel {
                     grid-column: 1 / -1;
-                    display: flex;
-                    justify-content: space-around;
-                    align-items: center;
                 }
                 .bjc-bankroll-input-group {
                     display: flex;
@@ -349,20 +412,19 @@ const BlackjackCounter = ({ onGoBack }) => {
                     font-size: 1.2rem;
                     font-weight: bold;
                     border-radius: 8px;
-                    width: 100px;
+                    width: 120px;
                     padding: 0.5rem;
                     text-align: center;
                 }
-                .bjc-bankroll-value {
-                    font-size: 1.5rem;
-                    font-weight: bold;
+                
+                .bjc-chart-panel {
+                    grid-column: 1 / -1;
                 }
 
                 @media (max-width: 640px) {
                     .bjc-main-grid { grid-template-columns: 1fr; }
                     .bjc-counts-display { flex-direction: column; gap: 1rem; }
                     .bjc-remaining-cards, .bjc-deviations { grid-column: 1 / -1; }
-                    .bjc-bankroll-panel { flex-direction: column; gap: 1rem; }
                 }
             `}</style>
             <div className="bjc-app-container">
@@ -402,23 +464,23 @@ const BlackjackCounter = ({ onGoBack }) => {
                     </div>
 
                     <div className="bjc-panel bjc-bet-display">
-                        <div className="bjc-count-label">Recommended Bet</div>
-                        <div className="bjc-bet-value">${recommendedBet.toFixed(2)}</div>
+                        <div className="bjc-count-label">Recommended Bet (Advantage: {(advantage * 100).toFixed(2)}%)</div>
+                        {recommendedBet > 0 ? (
+                            <div className="bjc-bet-value">${recommendedBet.toFixed(2)}</div>
+                        ) : (
+                            <div className="bjc-bet-value no-bet">Don't Bet</div>
+                        )}
                     </div>
                     
                     <div className="bjc-panel bjc-bankroll-panel">
                         <div className="bjc-bankroll-input-group">
-                            <label className="bjc-count-label">Table Min / Bet Unit</label>
+                            <label className="bjc-count-label">Table Minimum Bet</label>
                             <input 
                                 type="number" 
-                                value={betUnit} 
-                                onChange={(e) => setBetUnit(parseInt(e.target.value) || 0)} 
+                                value={tableMinBet} 
+                                onChange={(e) => setTableMinBet(parseInt(e.target.value) || 0)} 
                                 className="bjc-bankroll-input"
                             />
-                        </div>
-                        <div className="bjc-count-item">
-                            <div className="bjc-count-label">Rec. Bankroll</div>
-                            <div className="bjc-bankroll-value">${recommendedBankroll.toLocaleString()}</div>
                         </div>
                     </div>
 
@@ -462,6 +524,11 @@ const BlackjackCounter = ({ onGoBack }) => {
                         ) : (
                             <p style={{fontSize: '0.9rem', color: '#8e8e93'}}>None</p>
                         )}
+                    </div>
+
+                    <div className="bjc-panel bjc-chart-panel">
+                        <div className="bjc-panel-title">Count Trends</div>
+                        <canvas ref={chartCanvasRef}></canvas>
                     </div>
                 </div>
             </div>
