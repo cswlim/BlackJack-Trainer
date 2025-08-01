@@ -3,7 +3,7 @@
 // ===================================================================================
 import React, { useCallback } from 'react';
 
-const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
+const BasicStrategyModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
     const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
     const hardTotals = ['7-', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
     const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
@@ -209,4 +209,5 @@ const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateS
     );
 };
 
-export default BasicStrategyChartModal;
+
+export default BasicStrategyModal;
