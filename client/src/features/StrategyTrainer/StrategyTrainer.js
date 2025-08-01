@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Card from '../../components/Card';
 import HistoryTracker from '../../components/HistoryTracker';
 import StreakCounter from '../../components/StreakCounter';
-import BasicStrategyChartModal from '../../components/BasicStrategyChartModal';
+import BasicStrategyChartModal from '../../components/BasicStrategyModal';
 import CountPromptModal from '../../components/CountPromptModal';
 import { getBasicStrategy, getCardCountValue } from '../../utils/blackjackLogic';
 
@@ -935,3 +935,4 @@ const BlackjackTrainer = ({ onGoBack }) => {
 }
 
 export default BlackjackTrainer;
+
