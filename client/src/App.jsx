@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 // A script loader is included in the BlackjackCounter component.
 
 // ===================================================================================
-// --- 1. ADVANCED BLACKJACK COUNTER COMPONENT (Converted from HTML) ---
+// --- 1. ADVANCED BLACKJACK COUNTER COMPONENT (Reverted to simple, rectangular design) ---
 // ===================================================================================
 
 const BlackjackCounter = ({ onGoBack }) => {
@@ -17,21 +17,25 @@ const BlackjackCounter = ({ onGoBack }) => {
     const [lowCardsPlayed, setLowCardsPlayed] = useState(0);
     const [neutralCardsPlayed, setNeutralCardsPlayed] = useState(0);
     const [highCardsPlayed, setHighCardsPlayed] = useState(0);
+    const [acesPlayed, setAcesPlayed] = useState(0); // New state for aces
     const [trendData, setTrendData] = useState([]);
+    const [showDeckSelector, setShowDeckSelector] = useState(false);
 
-    // --- REFS FOR CHART ---
+    // --- REFS ---
     const chartCanvasRef = useRef(null);
     const chartInstanceRef = useRef(null);
+    const deckSelectorRef = useRef(null);
+
 
     // --- DERIVED CONSTANTS ---
-    // These values are recalculated whenever the number of decks changes.
-    const { TOTAL_CARDS, INITIAL_LOW_CARDS, INITIAL_NEUTRAL_CARDS, INITIAL_HIGH_CARDS } = useMemo(() => {
+    const { TOTAL_CARDS, INITIAL_LOW_CARDS, INITIAL_NEUTRAL_CARDS, INITIAL_HIGH_CARDS, TOTAL_ACES } = useMemo(() => {
         const CARDS_PER_DECK = 52;
         return {
             TOTAL_CARDS: numDecks * CARDS_PER_DECK,
             INITIAL_LOW_CARDS: 5 * 4 * numDecks, // 2,3,4,5,6
             INITIAL_NEUTRAL_CARDS: 3 * 4 * numDecks, // 7,8,9
             INITIAL_HIGH_CARDS: 5 * 4 * numDecks, // 10,J,Q,K,A
+            TOTAL_ACES: 4 * numDecks,
         };
     }, [numDecks]);
 
@@ -51,16 +55,18 @@ const BlackjackCounter = ({ onGoBack }) => {
         setLowCardsPlayed(0);
         setNeutralCardsPlayed(0);
         setHighCardsPlayed(0);
+        setAcesPlayed(0); // Reset aces
         setTrendData([]);
         console.log("Counter and history have been reset.");
     }, []);
 
     const handleDeckChange = (newDeckCount) => {
         setNumDecks(newDeckCount);
-        resetAll(); // Reset all stats when the number of decks changes
+        resetAll();
+        setShowDeckSelector(false);
     };
 
-    const handleCard = (value) => {
+    const handleCard = (value, isAce = false) => {
         if (cardsPlayed >= TOTAL_CARDS) {
             console.warn("Shoe is finished. Please reset.");
             return;
@@ -68,7 +74,6 @@ const BlackjackCounter = ({ onGoBack }) => {
 
         const newTrendData = [...trendData];
         
-        // Store previous state for undo
         newTrendData.push({
             rc: runningCount,
             tc: calculateTrueCount(),
@@ -77,6 +82,8 @@ const BlackjackCounter = ({ onGoBack }) => {
             lowCardsPlayedBefore: lowCardsPlayed,
             neutralCardsPlayedBefore: neutralCardsPlayed,
             highCardsPlayedBefore: highCardsPlayed,
+            acesPlayedBefore: acesPlayed, // Store ace count for undo
+            isAce: isAce
         });
 
         setRunningCount(prev => prev + value);
@@ -85,7 +92,12 @@ const BlackjackCounter = ({ onGoBack }) => {
 
         if (value === 1) setLowCardsPlayed(p => p + 1);
         else if (value === 0) setNeutralCardsPlayed(p => p + 1);
-        else if (value === -1) setHighCardsPlayed(p => p + 1);
+        else if (value === -1) {
+            setHighCardsPlayed(p => p + 1);
+            if (isAce) {
+                setAcesPlayed(p => p + 1);
+            }
+        }
     };
 
     const undoLastAction = () => {
@@ -97,18 +109,30 @@ const BlackjackCounter = ({ onGoBack }) => {
         const newTrendData = [...trendData];
         const lastAction = newTrendData.pop();
         
-        // Revert to the state before the last action
         setRunningCount(lastAction.rc);
         setCardsPlayed(lastAction.cardsPlayedBefore);
         setLowCardsPlayed(lastAction.lowCardsPlayedBefore);
         setNeutralCardsPlayed(lastAction.neutralCardsPlayedBefore);
         setHighCardsPlayed(lastAction.highCardsPlayedBefore);
+        setAcesPlayed(lastAction.acesPlayedBefore); // Revert ace count
         setTrendData(newTrendData);
     };
 
-    // --- CHART LOGIC ---
+    // --- CHART LOGIC & Event Listeners ---
     useEffect(() => {
-        // This effect loads the Chart.js script and initializes the chart
+        const handleClickOutside = (event) => {
+            if (deckSelectorRef.current && !deckSelectorRef.current.contains(event.target)) {
+                setShowDeckSelector(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+    
+    useEffect(() => {
         const script = document.createElement('script');
         script.src = "https://cdn.jsdelivr.net/npm/chart.js";
         script.async = true;
@@ -156,7 +180,6 @@ const BlackjackCounter = ({ onGoBack }) => {
 
         document.body.appendChild(script);
 
-        // Cleanup function to remove the script and destroy the chart
         return () => {
             if (document.body.contains(script)) {
                 document.body.removeChild(script);
@@ -168,7 +191,6 @@ const BlackjackCounter = ({ onGoBack }) => {
     }, []);
 
     useEffect(() => {
-        // This effect updates the chart whenever trendData changes
         if (chartInstanceRef.current) {
             const currentTrueCount = calculateTrueCount();
             const allData = [...trendData, { rc: runningCount, tc: currentTrueCount }];
@@ -187,7 +209,6 @@ const BlackjackCounter = ({ onGoBack }) => {
     return (
         <>
             <style>{`
-                /* Styles specifically for the Blackjack Counter, prefixed with bjc- */
                 .bjc-body, .bjc-html {
                   margin: 0;
                   padding: 0;
@@ -197,7 +218,6 @@ const BlackjackCounter = ({ onGoBack }) => {
                   -webkit-tap-highlight-color: transparent;
                 }
                 .bjc-app-container {
-                  position: relative;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
@@ -208,14 +228,25 @@ const BlackjackCounter = ({ onGoBack }) => {
                   text-align: center;
                   background-color: #121212;
                 }
-                .bjc-top-buttons {
-                  position: absolute;
-                  top: 1.5rem;
-                  right: 1.5rem;
-                  display: flex;
-                  gap: 0.5rem;
+                .bjc-header {
+                    width: 100%;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 1.5rem;
+                    max-width: 380px;
+                    position: relative; /* For pop-out positioning */
                 }
-                .bjc-utility-button-top {
+                .bjc-header-right {
+                    display: flex;
+                    gap: 0.5rem;
+                }
+                .bjc-title {
+                  font-size: 1.8rem;
+                  font-weight: 700;
+                  color: #ffffff;
+                }
+                .bjc-header-button {
                   background-color: #3a3a3c;
                   color: white;
                   border: none;
@@ -225,21 +256,50 @@ const BlackjackCounter = ({ onGoBack }) => {
                   cursor: pointer;
                   transition: background-color 0.2s;
                 }
-                .bjc-utility-button-top:hover {
-                  background-color: #555;
+                .bjc-header-button:hover { background-color: #555; }
+                
+                /* Deck Pop-out Selector */
+                .bjc-deck-popout {
+                    position: absolute;
+                    top: calc(100% + 10px);
+                    right: 0;
+                    background-color: #2c2c2e;
+                    border-radius: 12px;
+                    padding: 0.75rem;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+                    z-index: 10;
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 0.5rem;
+                    border: 1px solid #444;
                 }
-                .bjc-reset-button { background-color: #8e8e93; }
-                .bjc-back-button { background-color: #007aff; }
+                .bjc-deck-popout-button {
+                    width: 45px;
+                    height: 45px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    border: none;
+                    border-radius: 8px;
+                    background-color: #3a3a3c;
+                    color: #e0e0e0;
+                    cursor: pointer;
+                    transition: background-color 0.2s, transform 0.1s;
+                }
+                .bjc-deck-popout-button:hover {
+                    background-color: #555;
+                }
+                .bjc-deck-popout-button:active {
+                    transform: scale(0.95);
+                }
+                .bjc-deck-popout-button.active {
+                    background-color: #007aff;
+                    color: white;
+                }
 
-                .bjc-title {
-                  font-size: 2.2rem;
-                  font-weight: 700;
-                  margin-top: 2.5rem;
-                  margin-bottom: 1rem;
-                  color: #ffffff;
-                }
-                /* Deck Selector Styles */
-                .bjc-deck-selector {
+                .bjc-controls-panel {
                     background-color: #1c1c1e;
                     border-radius: 20px;
                     padding: 1rem;
@@ -248,36 +308,23 @@ const BlackjackCounter = ({ onGoBack }) => {
                     max-width: 380px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
                 }
-                .bjc-deck-selector h4 {
-                    margin: 0 0 0.75rem 0;
-                    font-size: 1rem;
-                    color: #8e8e93;
-                    text-transform: uppercase;
-                }
-                .bjc-deck-selector .bjc-deck-buttons {
+                .bjc-utility-buttons {
                     display: flex;
-                    justify-content: space-around;
-                    gap: 0.5rem;
+                    gap: 0.75rem;
                 }
-                .bjc-deck-button {
+                .bjc-utility-button {
                     flex-grow: 1;
-                    padding: 0.5rem;
-                    font-size: 1.1rem;
-                    font-weight: 600;
-                    border: 2px solid #3a3a3c;
-                    border-radius: 10px;
-                    background-color: transparent;
-                    color: #e0e0e0;
-                    cursor: pointer;
-                    transition: background-color 0.2s, border-color 0.2s;
-                }
-                .bjc-deck-button:hover {
                     background-color: #3a3a3c;
-                }
-                .bjc-deck-button.active {
-                    background-color: #007aff;
-                    border-color: #007aff;
                     color: white;
+                    border: none;
+                    border-radius: 10px;
+                    padding: 0.6rem 1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                }
+                .bjc-utility-button:hover {
+                    background-color: #555;
                 }
 
                 .bjc-counter-display {
@@ -337,6 +384,12 @@ const BlackjackCounter = ({ onGoBack }) => {
                 .bjc-plus { background-color: #34c759; }
                 .bjc-zero { background-color: #5856d6; }
                 .bjc-minus { background-color: #ff3b30; }
+                .bjc-minus-group { display: flex; gap: 0.5rem; }
+                .bjc-ace-button {
+                    flex-shrink: 0;
+                    width: 60px; /* smaller width */
+                    background-color: #ff9500; /* orange */
+                }
                 .bjc-stats-container {
                   width: 100%;
                   max-width: 380px;
@@ -353,6 +406,9 @@ const BlackjackCounter = ({ onGoBack }) => {
                   padding: 1rem;
                   border-radius: 20px;
                   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                }
+                .bjc-stats-grid.two-col {
+                    grid-template-columns: repeat(2, 1fr);
                 }
                 .bjc-stats-grid h4 {
                   grid-column: 1 / -1;
@@ -381,25 +437,33 @@ const BlackjackCounter = ({ onGoBack }) => {
                 }
             `}</style>
             <div className="bjc-app-container">
-                <div className="bjc-top-buttons">
-                    <button className="bjc-utility-button-top bjc-back-button" onClick={onGoBack}>Back</button>
-                    <button className="bjc-utility-button-top" onClick={undoLastAction}>Undo</button>
-                    <button className="bjc-utility-button-top bjc-reset-button" onClick={resetAll}>Reset</button>
+                <div className="bjc-header" ref={deckSelectorRef}>
+                    <h1 className="bjc-title">Card Counter</h1>
+                    <div className="bjc-header-right">
+                       <button className="bjc-header-button" onClick={() => setShowDeckSelector(!showDeckSelector)}>
+                           {numDecks}D
+                       </button>
+                       <button className="bjc-header-button" onClick={onGoBack}>Back</button>
+                    </div>
+                    {showDeckSelector && (
+                        <div className="bjc-deck-popout">
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map(d => (
+                                <button
+                                    key={d}
+                                    className={`bjc-deck-popout-button ${numDecks === d ? 'active' : ''}`}
+                                    onClick={() => handleDeckChange(d)}
+                                >
+                                    {d}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                <div className="bjc-title">Advanced Blackjack Counter</div>
 
-                <div className="bjc-deck-selector">
-                    <h4>Decks in Shoe</h4>
-                    <div className="bjc-deck-buttons">
-                        {[1, 2, 4, 6, 8].map(d => (
-                            <button
-                                key={d}
-                                className={`bjc-deck-button ${numDecks === d ? 'active' : ''}`}
-                                onClick={() => handleDeckChange(d)}
-                            >
-                                {d}
-                            </button>
-                        ))}
+                <div className="bjc-controls-panel">
+                    <div className="bjc-utility-buttons">
+                        <button className="bjc-utility-button" onClick={undoLastAction}>Undo</button>
+                        <button className="bjc-utility-button" onClick={resetAll}>Reset</button>
                     </div>
                 </div>
 
@@ -414,7 +478,10 @@ const BlackjackCounter = ({ onGoBack }) => {
                 <div className="bjc-buttons">
                     <button className="bjc-button bjc-plus" onClick={() => handleCard(1)}>+1 <span className="bjc-hint">Cards 2–6</span></button>
                     <button className="bjc-button bjc-zero" onClick={() => handleCard(0)}>0 <span className="bjc-hint">Cards 7–9</span></button>
-                    <button className="bjc-button bjc-minus" onClick={() => handleCard(-1)}>-1 <span className="bjc-hint">10, J, Q, K, A</span></button>
+                    <div className="bjc-minus-group">
+                        <button className="bjc-button bjc-minus" style={{flexGrow: 1}} onClick={() => handleCard(-1)}>-1 <span className="bjc-hint">10, J, Q, K</span></button>
+                        <button className="bjc-button bjc-ace-button" onClick={() => handleCard(-1, true)}>A</button>
+                    </div>
                 </div>
 
                 <div className="bjc-stats-container">
@@ -424,9 +491,10 @@ const BlackjackCounter = ({ onGoBack }) => {
                         <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_NEUTRAL_CARDS - neutralCardsPlayed}</div><div className="bjc-stat-label">Neutral (7-9)</div></div>
                         <div className="bjc-stat-item"><div className="bjc-stat-value">{INITIAL_HIGH_CARDS - highCardsPlayed}</div><div className="bjc-stat-label">High (10-A)</div></div>
                     </div>
-                    <div className="bjc-stats-grid">
-                        <h4>Cards Played</h4>
-                        <div className="bjc-stat-item" style={{ gridColumn: '1 / -1' }}><div className="bjc-stat-value">{cardsPlayed} / {TOTAL_CARDS}</div><div className="bjc-stat-label">Total</div></div>
+                    <div className="bjc-stats-grid two-col">
+                        <h4>Shoe Stats</h4>
+                        <div className="bjc-stat-item"><div className="bjc-stat-value">{cardsPlayed} / {TOTAL_CARDS}</div><div className="bjc-stat-label">Cards Played</div></div>
+                        <div className="bjc-stat-item"><div className="bjc-stat-value">{TOTAL_ACES - acesPlayed}</div><div className="bjc-stat-label">Aces Left</div></div>
                     </div>
                 </div>
 
@@ -444,476 +512,6 @@ const BlackjackCounter = ({ onGoBack }) => {
 // --- 2. BLACKJACK TRAINER COMPONENT (Your original React App) ---
 // ===================================================================================
 
-// --- HELPER FUNCTIONS & DATA ---
-
-const getBasicStrategy = (playerHand, dealerUpCard) => {
-    const handValue = card => {
-        if (!card) return 0;
-        if (['J', 'Q', 'K'].includes(card.rank)) return 10;
-        if (card.rank === 'A') return 11;
-        return parseInt(card.rank);
-    };
-
-    const calculateScore = (hand) => {
-        let score = 0;
-        let aceCount = 0;
-        hand.forEach(card => {
-            if (!card) return;
-            if (card.rank === 'A') {
-                aceCount++;
-            } else if (['J', 'Q', 'K'].includes(card.rank)) {
-                score += 10;
-            } else {
-                score += parseInt(card.rank);
-            }
-        });
-
-        if (aceCount === 0) {
-            return { score: score, isSoft: false, display: `${score}` };
-        }
-
-        const lowScore = score + aceCount;
-        const highScore = lowScore + 10;
-        
-        if (highScore === 21 && hand.length === 2) {
-            return { score: 21, isSoft: false, display: 'Blackjack' };
-        }
-
-        if (highScore > 21) {
-            return { score: lowScore, isSoft: false, display: `${lowScore}` };
-        } else {
-            return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
-        }
-    };
-
-    const player = calculateScore(playerHand);
-    const dealerValue = handValue(dealerUpCard);
-    const canDouble = playerHand.length === 2;
-
-    // Strategy based on the provided chart (4/6/8 Decks, Dealer Stands on All 17s)
-    // H = Hit, S = Stand, D = Double, P = Split, R = Surrender (not implemented, default to H)
-
-    // Pairs
-    if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
-        const rank = playerHand[0].rank;
-        switch (rank) {
-            case 'A': return 'P';
-            case '10': case 'J': case 'Q': case 'K': return 'S';
-            case '9':
-                if ([7, 10, 11].includes(dealerValue)) return 'S';
-                return 'P';
-            case '8': return 'P';
-            case '7':
-                if (dealerValue <= 7) return 'P';
-                return 'H';
-            case '6':
-                if (dealerValue <= 6) return 'P';
-                return 'H';
-            case '5':
-                if (dealerValue <= 9) return canDouble ? 'D' : 'H'; // Chart says D vs 2-9
-                return 'H';
-            case '4':
-                // Custom rule: 4,4 vs 4 is Hit, not Split (as per user request, overriding chart)
-                if (dealerValue === 4) return 'H';
-                if ([5, 6].includes(dealerValue)) return 'P'; // Chart says P vs 5,6
-                return 'H'; // All other 4,4 pairs are Hit
-            case '3': case '2':
-                if (dealerValue <= 7) return 'P';
-                return 'H';
-            default: return 'H'; // Should not happen
-        }
-    }
-
-    // Soft Totals
-    if (player.isSoft) {
-        const softTotal = player.score; // This is the high score (e.g., A+7 = 18)
-        switch (softTotal) {
-            case 20: // A,9
-                return 'S';
-            case 19: // A,8
-                if (dealerValue === 6) return canDouble ? 'D' : 'S';
-                return 'S';
-            case 18: // A,7
-                if ([2, 3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'S';
-                if ([7, 8].includes(dealerValue)) return 'S';
-                return 'H';
-            case 17: // A,6
-                if ([3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-                return 'H';
-            case 16: // A,5
-                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-                return 'H';
-            case 15: // A,4
-                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-                return 'H';
-            case 14: // A,3
-                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-                return 'H';
-            case 13: // A,2
-                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
-                return 'H';
-            default: return 'H'; // Should not happen for soft totals < 13
-        }
-    }
-
-    // Hard Totals
-    const hardTotal = player.score; // This is the final score if not soft
-    if (hardTotal >= 17) return 'S';
-    if (hardTotal >= 13 && hardTotal <= 16) {
-        if (dealerValue <= 6) return 'S';
-        return 'H';
-    }
-    if (hardTotal === 12) {
-        if ([4, 5, 6].includes(dealerValue)) return 'S';
-        return 'H';
-    }
-    if (hardTotal === 11) {
-        if (dealerValue === 11) return 'H'; // Chart says H vs A
-        return canDouble ? 'D' : 'H';
-    }
-    if (hardTotal === 10) {
-        if (dealerValue <= 9) return canDouble ? 'D' : 'H';
-        return 'H';
-    }
-    if (hardTotal === 9) {
-        if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
-        return 'H';
-    }
-    // Hard totals 5-8 (chart says H for all)
-    if (hardTotal >= 5 && hardTotal <= 8) return 'H';
-
-    return 'H'; // Default catch-all, should be covered by above
-};
-
-const getCardCountValue = (card) => {
-    const rank = card.rank;
-    if (['2', '3', '4', '5', '6'].includes(rank)) return 1;
-    if (['10', 'J', 'Q', 'K', 'A'].includes(rank)) return -1;
-    return 0;
-};
-
-// --- UI COMPONENTS ---
-
-const Card = ({ suit, rank, isHidden, isCutCard }) => {
-    if (isCutCard) {
-        return <div className="flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold text-xs sm:text-base">CUT</div>;
-    }
-    if (isHidden) {
-        return <div className="flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-[calc(100%-0.5rem)] h-[calc(100%-0.5rem)] bg-gray-600 rounded-md"></div></div>;
-    }
-    const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
-    return (
-        <div className="relative flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-white rounded-lg border border-gray-200 shadow-md p-1 sm:p-2 transition-all transform animate-deal">
-            <div className={`absolute top-1 left-2 text-center leading-none ${suitColor}`}>
-                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
-            </div>
-            <div className={`absolute inset-0 flex items-center justify-center text-[clamp(2.5rem,10vw,4rem)] sm:text-5xl md:text-6xl ${suitColor}`}>
-                {suit}
-            </div>
-            <div className={`absolute bottom-1 right-2 text-center leading-none rotate-180 ${suitColor}`}>
-                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
-            </div>
-        </div>
-    );
-};
-
-const CountPromptModal = ({ onConfirm }) => {
-    const [count, setCount] = useState('');
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-700 p-6 rounded-xl shadow-2xl w-80 text-center">
-                <h3 className="text-xl font-bold mb-4 text-gray-100">What's the Running Count?</h3>
-                <input
-                    type="number"
-                    value={count}
-                    onChange={(e) => setCount(e.target.value)}
-                    className="w-full p-3 text-center text-2xl font-mono bg-gray-800 border border-gray-600 rounded-lg mb-4 text-gray-100"
-                    autoFocus
-                />
-                <button onClick={() => onConfirm(parseInt(count))} className="w-full bg-blue-500 text-white font-semibold py-3 rounded-lg hover:bg-blue-600 transition">Confirm</button>
-            </div>
-        </div>
-    );
-};
-
-const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount }) => {
-    const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
-    
-    return (
-        <div className="w-full md:w-72 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 group">
-            <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
-                <h3 className="text-lg font-bold">History</h3>
-                <div className="flex flex-col items-end text-sm space-y-1">
-                    <div className="flex gap-3">
-                        <span className="text-blue-400">W: {winCount}</span>
-                        <span className="text-orange-400">L: {lossCount}</span>
-                        <span className="text-gray-400">P: {pushCount}</span>
-                    </div>
-                    <div className="flex gap-3">
-                        <span className="text-green-400">✅ {correctCount}</span>
-                        <span className="text-red-400">❌ {incorrectCount}</span>
-                    </div>
-                    <div className="flex gap-3">
-                        <span className="text-yellow-400">P-BJ: {playerBjCount}</span>
-                        <span className="text-purple-400">D-BJ: {dealerBjCount}</span>
-                    </div>
-                </div>
-            </div>
-            <ul className="space-y-2 max-h-28 overflow-hidden transition-all duration-300 group-hover:max-h-96 group-hover:overflow-y-auto">
-                {history.slice(0, 25).map((item, index) => (
-                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-25'}`}>
-                        {item.isResult ? (
-                            <span className="font-bold text-yellow-300">{item.text}</span>
-                        ) : (
-                            <>
-                                <span className={item.correct ? 'text-green-400' : 'text-red-400'}>{item.correct ? '✅' : '❌'}</span> {item.text}
-                            </>
-                        )}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const StreakCounter = ({ streak, burstAnimClass }) => {
-    if (streak < 2) return null;
-
-    const getStreakClass = () => {
-        if (streak >= 300) return 'tier-8-box';
-        if (streak >= 250) return 'animate-fast-pulse-ring';
-        if (streak >= 200) return 'animate-slow-pulse-ring';
-        if (streak >= 150) return 'animate-pulse-flicker';
-        if (streak >= 100) return 'animate-energy-flicker';
-        if (streak >= 50) return 'animate-blue-aura';
-        if (streak >= 25) return 'animate-bright-glow';
-        if (streak >= 10) return 'animate-subtle-glow';
-        return '';
-    };
-    
-    const isCosmic = streak >= 300;
-
-    return (
-        <div className={`streak-box mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getStreakClass()} ${burstAnimClass}`}>
-            <span className={`text-2xl ${isCosmic ? 'cosmic-text' : ''}`}>🔥</span>
-            <span className={`text-xl font-bold ${isCosmic ? 'cosmic-text' : ''}`}>{streak} Streak!</span>
-        </div>
-    );
-};
-
-const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
-    const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
-    // Hard totals from the provided chart, including 5-7 as a range
-    const hardTotals = ['7-', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
-    const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
-    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As']; // Updated pairs notation
-
-    // Strategy data matching the provided image
-    const strategyData = {
-        hard: {
-            '17+': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-            '16': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
-            '15': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
-            '14': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
-            '13': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
-            '12': ['H', 'H', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
-            '11': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H'],
-            '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
-            '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
-            '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
-        },
-        soft: {
-            'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-            'A,8': ['S', 'S', 'S', 'S', 'D', 'S', 'S', 'S', 'S', 'S'],
-            'A,7': ['D', 'D', 'D', 'D', 'D', 'S', 'S', 'H', 'H', 'H'],
-            'A,6': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,5': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,4': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,3': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,2': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-        },
-        pairs: {
-            'As': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-            '10s': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-            '9s': ['P', 'P', 'P', 'P', 'P', 'S', 'P', 'P', 'S', 'S'],
-            '8s': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-            '7s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
-            '6s': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
-            '5s': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
-            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'], // Changed 4,4 vs 4 from P to H
-            '3s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
-            '2s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
-        }
-    };
-
-    const getPlayerHandKeyForChart = useCallback((hand) => {
-        if (!hand || hand.length === 0) return null;
-        const { score, isSoft } = calculateScore(hand);
-        const ranks = hand.map(card => card.rank);
-
-        // Handle pairs (normalize J,Q,K to 10)
-        if (hand.length === 2 && ranks[0] === ranks[1]) {
-            const normalizedRank = ['J', 'Q', 'K'].includes(ranks[0]) ? '10' : ranks[0];
-            return `${normalizedRank}s`; // Use 's' suffix
-        }
-        // Handle soft totals
-        if (isSoft) {
-            if (score >= 20) return 'A,9';
-            if (score === 19) return 'A,8';
-            if (score === 18) return 'A,7';
-            if (score === 17) return 'A,6';
-            if (score === 16) return 'A,5';
-            if (score === 15) return 'A,4';
-            if (score === 14) return 'A,3';
-            if (score === 13) return 'A,2';
-        }
-        // Handle hard totals
-        if (score >= 17) return '17+';
-        if (score >= 5 && score <= 7) return '7-';
-        return `${score}`;
-    }, [calculateScore]);
-
-    const getDealerUpCardKeyForChart = useCallback((card) => {
-        if (!card) return null;
-        // Normalize J,Q,K to 10 for dealer's up-card
-        if (['J', 'Q', 'K'].includes(card.rank)) return '10';
-        if (card.rank === 'A') return 'A';
-        return card.rank;
-    }, []);
-
-    const playerKey = playerHand ? getPlayerHandKeyForChart(playerHand) : null;
-    const dealerKey = dealerUpCard ? getDealerUpCardKeyForChart(dealerUpCard) : null;
-
-    const getActionColorClass = (action) => {
-        switch (action) {
-            case 'H': return 'bg-green-700 text-white';   // Hit: Muted Green
-            case 'S': return 'bg-red-700 text-white';     // Stand: Muted Red
-            case 'D': return 'bg-orange-700 text-white';  // Double: Muted Orange/Gold
-            case 'P': return 'bg-blue-900 text-white';    // Split: Darker Blue (Navy)
-            default: return 'bg-gray-700 text-gray-100';  // Default or unknown
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-sm md:max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
-                <button
-                    onClick={onClose}
-                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Basic Strategy Chart</h2>
-
-                <div className="space-y-6">
-                    {/* Hard Totals */}
-                    <div>
-                        <h3 className="text-lg font-semibold mb-2 text-yellow-300">Hard Totals</h3>
-                        <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-700">
-                                    <th className="p-1 text-center w-1/12">P</th>
-                                    {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {hardTotals.slice().reverse().map(playerTotal => (
-                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
-                                        {dealerRanks.map((dealerRank, colIndex) => {
-                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
-                                            const cellValue = strategyData.hard[playerTotal][colIndex];
-                                            return (
-                                                <td key={dealerRank} className={`p-1 text-center font-semibold
-                                                    ${getActionColorClass(cellValue)}
-                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
-                                                    {cellValue}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Soft Totals */}
-                    <div>
-                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Soft Totals</h3>
-                        <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-700">
-                                    <th className="p-1 text-center w-1/12">P</th>
-                                    {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {softTotals.slice().reverse().map(playerTotal => (
-                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
-                                        {dealerRanks.map((dealerRank, colIndex) => {
-                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
-                                            const cellValue = strategyData.soft[playerTotal][colIndex];
-                                            return (
-                                                <td key={dealerRank} className={`p-1 text-center font-semibold
-                                                    ${getActionColorClass(cellValue)}
-                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
-                                                    {cellValue}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pairs */}
-                    <div>
-                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Pairs</h3>
-                        <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-700">
-                                    <th className="p-1 text-center w-1/12">P</th>
-                                    {dealerRanks.map(rank => (
-                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pairs.slice().reverse().map(playerTotal => (
-                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
-                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
-                                        {dealerRanks.map((dealerRank, colIndex) => {
-                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
-                                            const cellValue = strategyData.pairs[playerTotal][colIndex];
-                                            return (
-                                                <td key={dealerRank} className={`p-1 text-center font-semibold
-                                                    ${getActionColorClass(cellValue)}
-                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
-                                                    {cellValue}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
 const BlackjackTrainer = ({ onGoBack }) => {
     const [trainerMode, setTrainerMode] = useState(null);
     const NUM_DECKS = 6;
@@ -921,7 +519,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
     const [deck, setDeck] = useState([]);
     const [cutCardPosition, setCutCardPosition] = useState(0);
     const [isCutCardRevealed, setIsCutCardRevealed] = useState(false);
-    const [showCutCardOnTable, setShowCutCardOnTable] = useState(false);
     const [gameState, setGameState] = useState('pre-game');
     
     const [playerHands, setPlayerHands] = useState([]);
@@ -983,7 +580,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
         setDeck(newDeck);
         setRunningCount(0);
         setIsCutCardRevealed(false);
-        setShowCutCardOnTable(false);
     }, []);
 
     const calculateScore = useCallback((hand) => {
@@ -1018,96 +614,75 @@ const BlackjackTrainer = ({ onGoBack }) => {
         }
     }, []);
 
-    const dealCard = useCallback((callback) => {
-        setDeck(prevDeck => {
-            if (prevDeck.length === 0) {
-                callback(null);
-                return [];
-            }
-            const newDeck = [...prevDeck];
-            if (newDeck.length === cutCardPosition) {
-                setIsCutCardRevealed(true);
-                setShowCutCardOnTable(true);
-            }
-            const card = newDeck.pop();
-            setRunningCount(prev => prev + getCardCountValue(card));
-            callback(card);
-            return newDeck;
-        });
+    const dealCard = useCallback((currentDeck) => {
+        if (currentDeck.length === 0) {
+            return { card: null, newDeck: [] };
+        }
+        const newDeck = [...currentDeck];
+        if (newDeck.length === cutCardPosition) {
+            setIsCutCardRevealed(true);
+        }
+        const card = newDeck.pop();
+        return { card, newDeck };
     }, [cutCardPosition]);
 
     const dealNewGame = useCallback(() => {
-        const performDeal = () => {
-            endOfRoundMessageSet.current = false;
-            lastActionFeedback.current = '';
-            setMessage('');
-            setFeedback('');
-            setIsFeedbackCorrect(false); // Reset feedback color
-            setActiveHandIndex(0);
-            
-            if (trainerMode === 'solo') {
-                let cardsToDeal = [];
-                let dealtCount = 0;
-                const dealInitialSolo = () => {
-                    if (dealtCount < 4) {
-                        dealCard(card => {
-                            cardsToDeal.push(card);
-                            dealtCount++;
-                            dealInitialSolo();
-                        });
-                    } else {
-                        const [playerCard1, dealerCard1, playerCard2, dealerCard2] = cardsToDeal;
-                        const tempPlayerHand = [playerCard1, playerCard2];
-                        const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
-                        const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-                        setPlayerHands([playerInitialState]);
-                        setDealerHand({ cards: tempDealerHand });
-                        const playerHasBj = playerInitialState.score === 21;
-                        const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
-                        if (playerHasBj || dealerHasBj) {
-                            setGameState('end');
-                        } else {
-                            setGameState('player-turn');
-                        }
-                    }
-                };
-                dealInitialSolo();
-            } else {
-                let tempTableHands = Array.from({ length: 7 }, () => ({ cards: [], status: 'playing' }));
-                let tempDealerHand = [];
-                let cardsToDealCount = 15;
-                
-                const dealCountingTable = () => {
-                    if (cardsToDealCount > 0) {
-                        dealCard(card => {
-                            // This part of the logic was complex and seems to have a bug.
-                            // Simplifying for now.
-                            cardsToDealCount--;
-                            dealCountingTable();
-                        });
-                    } else {
-                        // Simplified dealing for now
-                        setGameState('end');
-                    }
-                };
-                
-                dealCountingTable();
-            }
-        };
-
         if (isCutCardRevealed) {
             createShoe();
-            setTimeout(performDeal, 100);
-        } else {
-            performDeal();
+            setTimeout(() => setGameState('pre-deal'), 100);
+            return;
         }
-    }, [isCutCardRevealed, trainerMode, createShoe, calculateScore, dealCard]);
-    
+
+        endOfRoundMessageSet.current = false;
+        lastActionFeedback.current = '';
+        setMessage('');
+        setFeedback('');
+        setIsFeedbackCorrect(false);
+        setActiveHandIndex(0);
+
+        setDeck(prevDeck => {
+            let tempDeck = [...prevDeck];
+            if (tempDeck.length < 4) {
+                console.error("Not enough cards to deal a new game.");
+                return tempDeck;
+            }
+
+            const { card: playerCard1, newDeck: deck1 } = dealCard(tempDeck);
+            const { card: dealerCard1, newDeck: deck2 } = dealCard(deck1);
+            const { card: playerCard2, newDeck: deck3 } = dealCard(deck2);
+            const { card: dealerCard2, newDeck: deck4 } = dealCard(deck3);
+
+            const tempPlayerHand = [playerCard1, playerCard2];
+            const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+            const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
+
+            setPlayerHands([playerInitialState]);
+            setDealerHand({ cards: tempDealerHand });
+            
+            let newRunningCount = runningCount;
+            [playerCard1, dealerCard1, playerCard2, dealerCard2].forEach(c => {
+                newRunningCount += getCardCountValue(c);
+            });
+            setRunningCount(newRunningCount);
+
+            const playerHasBj = playerInitialState.score === 21;
+            const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
+            
+            if (playerHasBj || dealerHasBj) {
+                setGameState('end');
+            } else {
+                setGameState('player-turn');
+            }
+            
+            return deck4;
+        });
+    }, [isCutCardRevealed, createShoe, dealCard, calculateScore, runningCount]);
+
     const executePlayerAction = useCallback((actionCode, actionName) => {
         setIsActionDisabled(true);
-        const hands = trainerMode === 'solo' ? playerHands : tableHands;
-        const handIndex = trainerMode === 'solo' ? activeHandIndex : playerSeat;
-        const handsUpdater = trainerMode === 'solo' ? setPlayerHands : setTableHands;
+        const hands = playerHands;
+        const handIndex = activeHandIndex;
+        const handsUpdater = setPlayerHands;
 
         const currentHandRef = hands[handIndex];
         const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
@@ -1147,20 +722,25 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
 
         switch(actionCode) {
-            case 'H':
-                dealCard(card => {
-                    if(!card) return;
+            case 'H': {
+                const { card, newDeck } = dealCard(deck);
+                if(card) {
+                    setDeck(newDeck);
+                    setRunningCount(prev => prev + getCardCountValue(card));
                     handsUpdater(prevHands => {
                         const newHands = JSON.parse(JSON.stringify(prevHands));
                         newHands[handIndex].cards.push(card);
                         Object.assign(newHands[handIndex], calculateScore(newHands[handIndex].cards));
                         return newHands;
                     });
-                });
+                }
                 break;
-            case 'D':
-                dealCard(card => {
-                    if(!card) return;
+            }
+            case 'D': {
+                const { card, newDeck } = dealCard(deck);
+                if(card) {
+                    setDeck(newDeck);
+                    setRunningCount(prev => prev + getCardCountValue(card));
                     handsUpdater(prevHands => {
                         const newHands = JSON.parse(JSON.stringify(prevHands));
                         const currentHand = newHands[handIndex];
@@ -1174,8 +754,9 @@ const BlackjackTrainer = ({ onGoBack }) => {
                         }
                         return newHands;
                     });
-                });
+                }
                 break;
+            }
             case 'S': {
                 handsUpdater(prevHands => {
                     const newHands = JSON.parse(JSON.stringify(prevHands));
@@ -1186,64 +767,60 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 break;
             }
             case 'P': {
-                const handToSplit = hands[handIndex].cards;
-                const isAces = handToSplit[0].rank === 'A';
+                const { card: card1, newDeck: deck1 } = dealCard(deck);
+                const { card: card2, newDeck: deck2 } = dealCard(deck1);
                 
-                if (isAces) {
-                    dealCard(card1 => {
-                        dealCard(card2 => {
-                            const hand1 = { cards: [handToSplit[0], card1], status: 'stood' };
-                            const hand2 = { cards: [handToSplit[1], card2], status: 'stood' };
-                            Object.assign(hand1, calculateScore(hand1.cards));
-                            Object.assign(hand2, calculateScore(hand2.cards));
-                            setPlayerHands([hand1, hand2]);
-                        });
-                    });
-                } else {
-                    const newHands = JSON.parse(JSON.stringify(playerHands));
-                    newHands.splice(activeHandIndex, 1, 
-                        { cards: [handToSplit[0]], status: 'playing' },
-                        { cards: [handToSplit[1]], status: 'playing' }
-                    );
-                    setPlayerHands(newHands);
+                if (card1 && card2) {
+                    setDeck(deck2);
+                    setRunningCount(prev => prev + getCardCountValue(card1) + getCardCountValue(card2));
+                    const handToSplit = hands[handIndex].cards;
+                    const isAces = handToSplit[0].rank === 'A';
+
+                    if (isAces) {
+                        const hand1 = { cards: [handToSplit[0], card1], status: 'stood' };
+                        const hand2 = { cards: [handToSplit[1], card2], status: 'stood' };
+                        Object.assign(hand1, calculateScore(hand1.cards));
+                        Object.assign(hand2, calculateScore(hand2.cards));
+                        setPlayerHands([hand1, hand2]);
+                    } else {
+                        const newHands = JSON.parse(JSON.stringify(playerHands));
+                        newHands.splice(activeHandIndex, 1, 
+                            { cards: [handToSplit[0]], status: 'playing' },
+                            { cards: [handToSplit[1]], status: 'playing' }
+                        );
+                        setPlayerHands(newHands);
+                    }
                 }
                 break;
             }
             default: break;
         }
-    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, trainerMode, playerHands, playerSeat, tableHands, streakCount]);
+    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, playerHands, streakCount, deck]);
 
     const handlePlayerAction = useCallback((actionCode, actionName) => {
-        if (trainerMode === 'counting') {
-            setPendingPlayerAction({ actionCode, actionName });
-            setShowCountPrompt(true);
-        } else {
-            executePlayerAction(actionCode, actionName);
-        }
-    }, [trainerMode, executePlayerAction]);
+        executePlayerAction(actionCode, actionName);
+    }, [executePlayerAction]);
 
     const canSplit = useMemo(() => {
-        const hands = trainerMode === 'solo' ? playerHands : tableHands;
-        const index = trainerMode === 'solo' ? activeHandIndex : playerSeat;
-        if (!hands[index]) return false;
-        const cards = hands[index].cards;
+        if (!playerHands[activeHandIndex]) return false;
+        const cards = playerHands[activeHandIndex].cards;
         return cards.length === 2 && cards[0].rank === cards[1].rank;
-    }, [playerHands, tableHands, activeHandIndex, playerSeat, trainerMode]);
+    }, [playerHands, activeHandIndex]);
 
     const canDouble = useMemo(() => {
-        const hands = trainerMode === 'solo' ? playerHands : tableHands;
-        const index = trainerMode === 'solo' ? activeHandIndex : playerSeat;
-        if (!hands[index]) return false;
-        return hands[index].cards.length === 2;
-    }, [playerHands, tableHands, activeHandIndex, playerSeat, trainerMode]);
+        if (!playerHands[activeHandIndex]) return false;
+        return playerHands[activeHandIndex].cards.length === 2;
+    }, [playerHands, activeHandIndex]);
     
     useEffect(() => {
         if (gameState !== 'player-turn') return;
         const activeHand = playerHands[activeHandIndex];
-        if (activeHand && activeHand.cards.length === 1) {
+        if (activeHand && activeHand.cards.length === 1) { // After a split
             setTimeout(() => {
-                dealCard(card => {
-                    if (!card) return;
+                const { card, newDeck } = dealCard(deck);
+                if (card) {
+                    setDeck(newDeck);
+                    setRunningCount(prev => prev + getCardCountValue(card));
                     setPlayerHands(prevHands => {
                         const newHands = JSON.parse(JSON.stringify(prevHands));
                         const currentHand = newHands[activeHandIndex];
@@ -1254,10 +831,10 @@ const BlackjackTrainer = ({ onGoBack }) => {
                         }
                         return newHands;
                     });
-                });
+                }
             }, 500);
         }
-    }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard]);
+    }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard, deck]);
 
     useEffect(() => {
         if (gameState !== 'player-turn') {
@@ -1265,9 +842,9 @@ const BlackjackTrainer = ({ onGoBack }) => {
             return;
         }
 
-        const hands = trainerMode === 'solo' ? playerHands : tableHands;
-        const handsUpdater = trainerMode === 'solo' ? setPlayerHands : setTableHands;
-        const index = trainerMode === 'solo' ? activeHandIndex : playerSeat;
+        const hands = playerHands;
+        const handsUpdater = setPlayerHands;
+        const index = activeHandIndex;
 
         const newHands = JSON.parse(JSON.stringify(hands));
         const activeHand = newHands[index];
@@ -1280,22 +857,17 @@ const BlackjackTrainer = ({ onGoBack }) => {
         }
         
         if (activeHand && activeHand.status !== 'playing') {
-             if (trainerMode === 'solo') {
-                const nextHandIndex = newHands.findIndex((hand, i) => i > index && hand.status === 'playing');
-                if (nextHandIndex !== -1) {
-                    setActiveHandIndex(nextHandIndex);
-                } else {
-                    const allBusted = newHands.every(h => h.status === 'bust');
-                    if (allBusted) {
-                        setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
-                        setTimeout(() => setGameState('end'), 500);
-                    } else {
-                        setGameState('dealer-turn');
-                    }
-                }
+            const nextHandIndex = newHands.findIndex((hand, i) => i > index && hand.status === 'playing');
+            if (nextHandIndex !== -1) {
+                setActiveHandIndex(nextHandIndex);
             } else {
-                setActiveTableHandIndex(prev => prev + 1);
-                setGameState('ai-turn');
+                const allBusted = newHands.every(h => h.status === 'bust');
+                if (allBusted) {
+                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
+                    setTimeout(() => setGameState('end'), 500);
+                } else {
+                    setGameState('dealer-turn');
+                }
             }
         }
         
@@ -1305,91 +877,44 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
         setTimeout(() => setIsActionDisabled(false), 500);
 
-    }, [playerHands, tableHands, gameState, activeHandIndex, playerSeat, trainerMode]);
-
-    useEffect(() => {
-        if (gameState !== 'ai-turn') return;
-
-        if (activeTableHandIndex >= 7) {
-            setGameState('dealer-turn');
-            return;
-        }
-
-        if (activeTableHandIndex === playerSeat) {
-            setGameState('player-turn');
-            return;
-        }
-
-        const currentHand = tableHands[activeTableHandIndex];
-        const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
-        
-        const playAiHand = (hand) => {
-            const move = getBasicStrategy(hand.cards, dealerUpCard);
-            if (move === 'S' || hand.score >= 21) {
-                setTableHands(prev => {
-                    const newHands = [...prev];
-                    newHands[activeTableHandIndex].status = 'stood';
-                    return newHands;
-                });
-                setActiveTableHandIndex(prev => prev + 1);
-            } else {
-                dealCard(card => {
-                    if (card) {
-                        const newHandCards = [...hand.cards, card];
-                        const newHand = {...hand, cards: newHandCards, ...calculateScore(newHandCards) };
-                        setTableHands(prev => {
-                            const newHands = [...prev];
-                            newHands[activeTableHandIndex] = newHand;
-                            return newHands;
-                        });
-                        setTimeout(() => playAiHand(newHand), 300); // Reduced delay for AI
-                    }
-                });
-            }
-        };
-
-        playAiHand(currentHand);
-
-    }, [gameState, activeTableHandIndex, playerSeat, tableHands, dealerHand.cards, calculateScore, dealCard]);
+    }, [playerHands, gameState, activeHandIndex]);
 
     useEffect(() => {
         if (gameState !== 'dealer-turn') return;
 
-        setDealerHand(prev => ({
-            ...prev,
-            cards: prev.cards.map(c => ({...c, isHidden: false}))
-        }));
-
-        const dealerDrawLoop = () => {
-            setDealerHand(currentDealerHand => {
-                const scoreInfo = calculateScore(currentDealerHand.cards);
-                
-                if (scoreInfo.score < 17) {
-                    dealCard(card => {
-                        if (card) {
-                            setTimeout(() => {
-                                setDealerHand(prev => ({
-                                    ...prev,
-                                    cards: [...prev.cards, card],
-                                    ...calculateScore([...prev.cards, card])
-                                }));
-                                dealerDrawLoop();
-                            }, 300); // Reduced delay for dealer
-                        } else {
-                            setGameState('end');
-                        }
-                    });
-                    return currentDealerHand;
-                } else {
-                    setGameState('end');
-                    return currentDealerHand;
-                }
-            });
-        };
+        let currentDealerHand = JSON.parse(JSON.stringify(dealerHand));
+        currentDealerHand.cards = currentDealerHand.cards.map(c => ({...c, isHidden: false}));
         
-        dealerDrawLoop(); 
+        let tempDeck = [...deck];
+        let tempRunningCount = runningCount;
 
-    }, [gameState, calculateScore, dealCard]);
+        const drawLoop = () => {
+            const scoreInfo = calculateScore(currentDealerHand.cards);
+            if (scoreInfo.score < 17) {
+                const { card, newDeck } = dealCard(tempDeck);
+                if(card) {
+                    currentDealerHand.cards.push(card);
+                    tempDeck = newDeck;
+                    tempRunningCount += getCardCountValue(card);
+                    setTimeout(drawLoop, 300);
+                } else {
+                    finalize();
+                }
+            } else {
+                finalize();
+            }
+        };
+
+        const finalize = () => {
+            setDealerHand(currentDealerHand);
+            setDeck(tempDeck);
+            setRunningCount(tempRunningCount);
+            setGameState('end');
+        };
+
+        drawLoop();
+
+    }, [gameState, calculateScore, dealCard, dealerHand, deck, runningCount]);
     
     useEffect(() => {
         if (gameState === 'end' && !endOfRoundMessageSet.current) {
@@ -1398,7 +923,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
             
-            const handsToEvaluate = trainerMode === 'solo' ? playerHands : [tableHands[playerSeat]];
+            const handsToEvaluate = playerHands;
             
             const playerHasBj = handsToEvaluate.length === 1 && handsToEvaluate[0]?.cards.length === 2 && handsToEvaluate[0]?.score === 21;
             const dealerHasBj = dealerScoreInfo.score === 21 && revealedDealerHand.length === 2;
@@ -1452,7 +977,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
             setMessage(finalMessage);
             setHistory(prev => [{ text: resultMessage, isResult: true }, ...prev]);
         }
-    }, [gameState, playerHands, tableHands, dealerHand.cards, calculateScore, trainerMode, playerSeat]);
+    }, [gameState, playerHands, dealerHand.cards, calculateScore]);
 
     useEffect(() => {
         if (feedback) {
@@ -1482,24 +1007,21 @@ const BlackjackTrainer = ({ onGoBack }) => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
 
-    // Effect for burst animation
     useEffect(() => {
         if (burstKey > 0) {
             setBurstAnimClass('animate-long-pulse-burst');
-            const timer = setTimeout(() => setBurstAnimClass(''), 1500); // Animation duration
+            const timer = setTimeout(() => setBurstAnimClass(''), 1500);
             return () => clearTimeout(timer);
         }
     }, [burstKey]);
 
-    // Effect for wash away animation
     useEffect(() => {
         if (showWashAway) {
-            const timer = setTimeout(() => setShowWashAway(false), 1500); // Animation duration
+            const timer = setTimeout(() => setShowWashAway(false), 1500);
             return () => clearTimeout(timer);
         }
     }, [washAwayKey]);
 
-    // Effect for fullscreen announcement
     useEffect(() => {
         if (announcement) {
             const timer = setTimeout(() => setAnnouncement(null), 3500);
@@ -1507,9 +1029,8 @@ const BlackjackTrainer = ({ onGoBack }) => {
         }
     }, [announcement]);
 
-    // This effect runs when the component mounts to set up the initial state
     useEffect(() => {
-        setTrainerMode('solo'); // Set to solo mode by default
+        setTrainerMode('solo');
         createShoe();
         setHistory([]);
         setCorrectCount(0);
@@ -1525,30 +1046,12 @@ const BlackjackTrainer = ({ onGoBack }) => {
     }, [createShoe]);
 
 
-    const handleCountConfirm = (val) => {
-        setShowCountPrompt(false);
-        let countFeedback = `You entered: ${val}. Actual count: ${runningCount}. `;
-        if (val === runningCount) {
-            countFeedback += "✅ Correct!";
-        } else {
-            countFeedback += "❌ Incorrect.";
-        }
-        setFeedback(countFeedback);
-        if (pendingPlayerAction) {
-            executePlayerAction(pendingPlayerAction.actionCode, pendingPlayerAction.actionName);
-            setPendingPlayerAction(null);
-        }
-    };
-
     const activePlayerHand = useMemo(() => {
-        if (trainerMode === 'solo' && playerHands.length > activeHandIndex) {
+        if (playerHands.length > activeHandIndex) {
             return playerHands[activeHandIndex].cards;
         }
-        if (trainerMode === 'counting' && playerSeat !== null && tableHands.length > playerSeat) {
-            return tableHands[playerSeat].cards;
-        }
         return [];
-    }, [trainerMode, playerHands, activeHandIndex, playerSeat, tableHands]);
+    }, [playerHands, activeHandIndex]);
 
     const dealerUpCard = useMemo(() => {
         return dealerHand.cards.find(card => !card.isHidden);
@@ -1690,7 +1193,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     />
                 )}
             </div>
-            {/* Styles for the Blackjack Trainer are now self-contained */}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
                 
@@ -1716,7 +1218,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 }
                 .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
                 
-                /* --- One-Shot Animations --- */
                 @keyframes long-pulse-burst {
                     0% {
                       transform: scale(1);
@@ -1724,7 +1225,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     }
                     50% {
                       transform: scale(1.15);
-                      box-shadow: 0 0 30px 10px rgba(147, 197, 253, 0.7); /* Blue bloom */
+                      box-shadow: 0 0 30px 10px rgba(147, 197, 253, 0.7);
                     }
                     100% {
                       transform: scale(1);
@@ -1743,7 +1244,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     animation: wash-away 1.5s ease-in forwards;
                 }
 
-                /* --- Continuous Animations --- */
                 @keyframes subtle-glow {
                     0%, 100% { text-shadow: 0 0 6px #ffffff55; }
                     50% { text-shadow: 0 0 10px #ffffff88; }
@@ -1874,7 +1374,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     animation: cosmic-text-glow 2s ease-in-out infinite alternate;
                 }
                 
-                /* --- Fullscreen Announcements --- */
                 #fullscreen-announcement {
                     display: none;
                     position: fixed;
