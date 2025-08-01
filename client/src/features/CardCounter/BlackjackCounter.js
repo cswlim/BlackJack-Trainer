@@ -382,14 +382,26 @@ const BlackjackCounter = ({ onGoBack }) => {
                 
                 .bjc-rank-grid {
                     display: grid;
-                    grid-template-columns: repeat(2, 1fr);
+                    grid-template-columns: 1fr;
                     gap: 0.5rem;
                 }
                 .bjc-rank-item {
                     display: flex;
                     justify-content: space-between;
+                    align-items: center;
                     font-size: 0.9rem;
                     padding: 0.2rem;
+                }
+                .bjc-rank-info {
+                    display: flex;
+                    align-items: baseline;
+                    gap: 0.5rem;
+                }
+                .bjc-rank-percent {
+                    font-size: 0.8rem;
+                    color: #8e8e93;
+                    width: 50px;
+                    text-align: right;
                 }
                 
                 .bjc-deviation-list {
@@ -515,12 +527,20 @@ const BlackjackCounter = ({ onGoBack }) => {
                     <div className="bjc-panel bjc-remaining-cards">
                         <div className="bjc-panel-title">Remaining Cards</div>
                         <div className="bjc-rank-grid">
-                            {cardRanks.map(rank => (
-                                <div key={rank} className="bjc-rank-item">
-                                    <span>{rank}:</span>
-                                    <span>{CARDS_PER_RANK[rank] - cardsPlayedByRank[rank]}</span>
-                                </div>
-                            ))}
+                            {cardRanks.map(rank => {
+                                const remaining = CARDS_PER_RANK[rank] - cardsPlayedByRank[rank];
+                                const totalRemaining = TOTAL_CARDS - cardsPlayed;
+                                const percentage = totalRemaining > 0 ? (remaining / totalRemaining) * 100 : 0;
+                                return (
+                                    <div key={rank} className="bjc-rank-item">
+                                        <div className="bjc-rank-info">
+                                            <span>{rank}:</span>
+                                            <span>{remaining}/{CARDS_PER_RANK[rank]}</span>
+                                        </div>
+                                        <span className="bjc-rank-percent">{percentage.toFixed(1)}%</span>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
 
