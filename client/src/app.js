@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
-import BlackjackTrainer from './features/StrategyTrainer/BlackjackTrainer';
+import BlackjackTrainer from './features/StrategyTrainer/StrategyTrainer'; // Corrected import path
 import BlackjackCounter from './features/CardCounter/BlackjackCounter';
 
-// Note: Global styles would typically go in an index.css file,
+// Note: Global styles would typically go in a separate index.css file,
 // but for this environment, we'll keep them here.
 const GlobalStyles = () => (
     <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
-        body { font-family: 'Nunito', sans-serif; overflow-x: hidden; }
-        .font-mono { font-family: 'Roboto Mono', monospace; }
-        /* ... other global styles ... */
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            overflow-x: hidden;
+            background-color: #121212; /* Ensure background is dark */
+        }
+        .font-mono {
+            font-family: 'Roboto Mono', monospace;
+        }
     `}</style>
 );
 
@@ -24,6 +30,7 @@ export default function App() {
         return <BlackjackCounter onGoBack={() => setGameMode(null)} />;
     }
 
+    // Default view: Mode Selection
     return (
         <>
             <GlobalStyles />
