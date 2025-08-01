@@ -52,7 +52,7 @@ const BlackjackCounter = ({ onGoBack }) => {
         setShowDeckSelector(false);
     };
 
-    const handleCard = (rank) => {
+    const handleCard = useCallback((rank) => {
         if (cardsPlayed >= TOTAL_CARDS) return;
 
         const countValueMap = { '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 0, '8': 0, '9': 0, 'T': -1, 'A': -1 };
@@ -62,9 +62,9 @@ const BlackjackCounter = ({ onGoBack }) => {
         setRunningCount(prev => prev + countValue);
         setCardsPlayed(prev => prev + 1);
         setCardsPlayedByRank(prev => ({ ...prev, [rank]: prev[rank] + 1 }));
-    };
+    }, [cardsPlayed, TOTAL_CARDS]);
 
-    const undoLastAction = () => {
+    const undoLastAction = useCallback(() => {
         if (history.length === 0) return;
         const lastAction = history[history.length - 1];
         
@@ -72,29 +72,27 @@ const BlackjackCounter = ({ onGoBack }) => {
         setCardsPlayed(prev => prev - 1);
         setCardsPlayedByRank(prev => ({ ...prev, [lastAction.rank]: prev[lastAction.rank] - 1 }));
         setHistory(prev => prev.slice(0, -1));
-    };
+    }, [history]);
 
     // --- BET SPREAD LOGIC ---
     const recommendedBet = useMemo(() => {
-        const tc = Math.round(trueCount);
-        let units = 1;
-        if (tc <= 1) {
-            units = 1;
-        } else if (tc === 2) {
-            units = 2;
-        } else if (tc === 3) {
-            units = 4;
-        } else if (tc === 4) {
-            units = 8;
-        } else if (tc >= 5) {
-            units = 12;
+        // This is a simplified Kelly Criterion approach for card counting.
+        // The formula is (True Count - 1) * Bet Unit, which sizes the bet according to the player's advantage.
+        if (trueCount <= 1) {
+            return betUnit; // No advantage, bet the table minimum.
         }
-        return units * betUnit;
+        
+        const betAmount = (trueCount - 1) * betUnit;
+        
+        // The bet should never be less than the minimum.
+        return Math.max(betUnit, betAmount);
     }, [trueCount, betUnit]);
 
     const recommendedBankroll = useMemo(() => {
+        // A common rule of thumb is to have a bankroll of 100 times your maximum bet.
+        // We'll estimate a reasonable max bet of 12 units for this calculation.
         const maxBet = 12 * betUnit;
-        return maxBet * 100; // Standard is 100 max bets to withstand variance
+        return maxBet * 100;
     }, [betUnit]);
 
     // --- PLAYING DEVIATIONS (ILLUSTRIOUS 18) ---
@@ -167,7 +165,7 @@ const BlackjackCounter = ({ onGoBack }) => {
             document.removeEventListener("mousedown", handleClickOutside);
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [deck, history]); // Add dependencies to ensure functions have latest state
+    }, [handleCard, undoLastAction]);
 
     const trueCountColor = trueCount >= 2 ? '#34c759' : trueCount <= -1 ? '#ff3b30' : '#e0e0e0';
     const cardRanks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T'];
@@ -405,7 +403,7 @@ const BlackjackCounter = ({ onGoBack }) => {
 
                     <div className="bjc-panel bjc-bet-display">
                         <div className="bjc-count-label">Recommended Bet</div>
-                        <div className="bjc-bet-value">${recommendedBet}</div>
+                        <div className="bjc-bet-value">${recommendedBet.toFixed(2)}</div>
                     </div>
                     
                     <div className="bjc-panel bjc-bankroll-panel">
