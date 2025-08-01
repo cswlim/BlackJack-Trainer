@@ -6,7 +6,468 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 // A script loader is included in the BlackjackCounter component.
 
 // ===================================================================================
-// --- 1. ADVANCED BLACKJACK COUNTER COMPONENT (Reverted to simple, rectangular design) ---
+// --- HELPER COMPONENTS & FUNCTIONS (Restored) ---
+// ===================================================================================
+
+const getBasicStrategy = (playerHand, dealerUpCard) => {
+    if (!playerHand || playerHand.length === 0) {
+        return 'H'; // Default action if hand is empty
+    }
+    const handValue = card => {
+        if (!card) return 0;
+        if (['J', 'Q', 'K'].includes(card.rank)) return 10;
+        if (card.rank === 'A') return 11;
+        return parseInt(card.rank);
+    };
+
+    const calculateScore = (hand) => {
+        let score = 0;
+        let aceCount = 0;
+        hand.forEach(card => {
+            if (!card) return;
+            if (card.rank === 'A') {
+                aceCount++;
+            } else if (['J', 'Q', 'K'].includes(card.rank)) {
+                score += 10;
+            } else {
+                score += parseInt(card.rank);
+            }
+        });
+
+        if (aceCount === 0) {
+            return { score: score, isSoft: false, display: `${score}` };
+        }
+
+        const lowScore = score + aceCount;
+        const highScore = lowScore + 10;
+        
+        if (highScore === 21 && hand.length === 2) {
+            return { score: 21, isSoft: false, display: 'Blackjack' };
+        }
+
+        if (highScore > 21) {
+            return { score: lowScore, isSoft: false, display: `${lowScore}` };
+        } else {
+            return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
+        }
+    };
+
+    const player = calculateScore(playerHand);
+    const dealerValue = handValue(dealerUpCard);
+    const canDouble = playerHand.length === 2;
+
+    // Pairs
+    if (playerHand.length === 2 && playerHand[0].rank === playerHand[1].rank) {
+        const rank = playerHand[0].rank;
+        switch (rank) {
+            case 'A': return 'P';
+            case '10': case 'J': case 'Q': case 'K': return 'S';
+            case '9':
+                if ([7, 10, 11].includes(dealerValue)) return 'S';
+                return 'P';
+            case '8': return 'P';
+            case '7':
+                if (dealerValue <= 7) return 'P';
+                return 'H';
+            case '6':
+                if (dealerValue <= 6) return 'P';
+                return 'H';
+            case '5':
+                if (dealerValue <= 9) return canDouble ? 'D' : 'H';
+                return 'H';
+            case '4':
+                if (dealerValue === 4) return 'H';
+                if ([5, 6].includes(dealerValue)) return 'P';
+                return 'H';
+            case '3': case '2':
+                if (dealerValue <= 7) return 'P';
+                return 'H';
+            default: return 'H';
+        }
+    }
+
+    // Soft Totals
+    if (player.isSoft) {
+        const softTotal = player.score;
+        switch (softTotal) {
+            case 20: return 'S';
+            case 19:
+                if (dealerValue === 6) return canDouble ? 'D' : 'S';
+                return 'S';
+            case 18:
+                if ([2, 3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'S';
+                if ([7, 8].includes(dealerValue)) return 'S';
+                return 'H';
+            case 17:
+                if ([3, 4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 16:
+                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 15:
+                if ([4, 5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 14:
+                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            case 13:
+                if ([5, 6].includes(dealerValue)) return canDouble ? 'D' : 'H';
+                return 'H';
+            default: return 'H';
+        }
+    }
+
+    // Hard Totals
+    const hardTotal = player.score;
+    if (hardTotal >= 17) return 'S';
+    if (hardTotal >= 13 && hardTotal <= 16) {
+        if (dealerValue <= 6) return 'S';
+        return 'H';
+    }
+    if (hardTotal === 12) {
+        if ([4, 5, 6].includes(dealerValue)) return 'S';
+        return 'H';
+    }
+    if (hardTotal === 11) {
+        if (dealerValue === 11) return 'H';
+        return canDouble ? 'D' : 'H';
+    }
+    if (hardTotal === 10) {
+        if (dealerValue <= 9) return canDouble ? 'D' : 'H';
+        return 'H';
+    }
+    if (hardTotal === 9) {
+        if (dealerValue >= 3 && dealerValue <= 6) return canDouble ? 'D' : 'H';
+        return 'H';
+    }
+    if (hardTotal >= 5 && hardTotal <= 8) return 'H';
+
+    return 'H';
+};
+
+const getCardCountValue = (card) => {
+    if (!card) return 0;
+    const rank = card.rank;
+    if (['2', '3', '4', '5', '6'].includes(rank)) return 1;
+    if (['10', 'J', 'Q', 'K', 'A'].includes(rank)) return -1;
+    return 0;
+};
+
+const Card = ({ suit, rank, isHidden, isCutCard }) => {
+    if (isCutCard) {
+        return <div className="flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-yellow-400 rounded-lg border-2 border-yellow-600 shadow-lg flex items-center justify-center text-black font-bold text-xs sm:text-base">CUT</div>;
+    }
+    if (isHidden) {
+        return <div className="flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-gray-700 rounded-lg border-2 border-gray-800 shadow-lg flex items-center justify-center"><div className="w-[calc(100%-0.5rem)] h-[calc(100%-0.5rem)] bg-gray-600 rounded-md"></div></div>;
+    }
+    const suitColor = ['♥', '♦'].includes(suit) ? 'text-red-600' : 'text-gray-900';
+    return (
+        <div className="relative flex-shrink-0 w-[clamp(5rem,18vw,8rem)] h-[clamp(7.5rem,27vw,12rem)] bg-white rounded-lg border border-gray-200 shadow-md p-1 sm:p-2 transition-all transform animate-deal">
+            <div className={`absolute top-1 left-2 text-center leading-none ${suitColor}`}>
+                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
+            </div>
+            <div className={`absolute inset-0 flex items-center justify-center text-[clamp(2.5rem,10vw,4rem)] sm:text-5xl md:text-6xl ${suitColor}`}>
+                {suit}
+            </div>
+            <div className={`absolute bottom-1 right-2 text-center leading-none rotate-180 ${suitColor}`}>
+                <p className="text-lg sm:text-2xl font-bold">{rank}</p>
+            </div>
+        </div>
+    );
+};
+
+const CountPromptModal = ({ onConfirm }) => {
+    const [count, setCount] = useState('');
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-gray-700 p-6 rounded-xl shadow-2xl w-80 text-center">
+                <h3 className="text-xl font-bold mb-4 text-gray-100">What's the Running Count?</h3>
+                <input
+                    type="number"
+                    value={count}
+                    onChange={(e) => setCount(e.target.value)}
+                    className="w-full p-3 text-center text-2xl font-mono bg-gray-800 border border-gray-600 rounded-lg mb-4 text-gray-100"
+                    autoFocus
+                />
+                <button onClick={() => onConfirm(parseInt(count))} className="w-full bg-blue-500 text-white font-semibold py-3 rounded-lg hover:bg-blue-600 transition">Confirm</button>
+            </div>
+        </div>
+    );
+};
+
+const HistoryTracker = ({ history, correctCount, incorrectCount, winCount, lossCount, pushCount, playerBjCount, dealerBjCount }) => {
+    const opacities = ['opacity-100', 'opacity-75', 'opacity-60', 'opacity-40', 'opacity-25'];
+    
+    return (
+        <div className="w-full md:w-72 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-20 group">
+            <div className="flex justify-between items-start border-b border-gray-600 pb-2 mb-2">
+                <h3 className="text-lg font-bold">History</h3>
+                <div className="flex flex-col items-end text-sm space-y-1">
+                    <div className="flex gap-3">
+                        <span className="text-blue-400">W: {winCount}</span>
+                        <span className="text-orange-400">L: {lossCount}</span>
+                        <span className="text-gray-400">P: {pushCount}</span>
+                    </div>
+                    <div className="flex gap-3">
+                        <span className="text-green-400">✅ {correctCount}</span>
+                        <span className="text-red-400">❌ {incorrectCount}</span>
+                    </div>
+                    <div className="flex gap-3">
+                        <span className="text-yellow-400">P-BJ: {playerBjCount}</span>
+                        <span className="text-purple-400">D-BJ: {dealerBjCount}</span>
+                    </div>
+                </div>
+            </div>
+            <ul className="space-y-2 max-h-28 overflow-hidden transition-all duration-300 group-hover:max-h-96 group-hover:overflow-y-auto">
+                {history.slice(0, 25).map((item, index) => (
+                    <li key={index} className={`text-sm transition-opacity duration-300 ${index < 5 ? opacities[index] : 'opacity-25'}`}>
+                        {item.isResult ? (
+                            <span className="font-bold text-yellow-300">{item.text}</span>
+                        ) : (
+                            <>
+                                <span className={item.correct ? 'text-green-400' : 'text-red-400'}>{item.correct ? '✅' : '❌'}</span> {item.text}
+                            </>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+const StreakCounter = ({ streak, burstAnimClass }) => {
+    if (streak < 2) return null;
+
+    const getStreakClass = () => {
+        if (streak >= 300) return 'tier-8-box';
+        if (streak >= 250) return 'animate-fast-pulse-ring';
+        if (streak >= 200) return 'animate-slow-pulse-ring';
+        if (streak >= 150) return 'animate-pulse-flicker';
+        if (streak >= 100) return 'animate-energy-flicker';
+        if (streak >= 50) return 'animate-blue-aura';
+        if (streak >= 25) return 'animate-bright-glow';
+        if (streak >= 10) return 'animate-subtle-glow';
+        return '';
+    };
+    
+    const isCosmic = streak >= 300;
+
+    return (
+        <div className={`streak-box mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 text-white ${getStreakClass()} ${burstAnimClass}`}>
+            <span className={`text-2xl ${isCosmic ? 'cosmic-text' : ''}`}>🔥</span>
+            <span className={`text-xl font-bold ${isCosmic ? 'cosmic-text' : ''}`}>{streak} Streak!</span>
+        </div>
+    );
+};
+
+const BasicStrategyChartModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
+    const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
+    const hardTotals = ['7-', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
+    const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
+    const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As'];
+
+    const strategyData = {
+        hard: {
+            '17+': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            '16': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '15': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '14': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '13': ['S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '12': ['H', 'H', 'S', 'S', 'S', 'H', 'H', 'H', 'H', 'H'],
+            '11': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H'],
+            '10': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
+            '9': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '8': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+            '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+        },
+        soft: {
+            'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            'A,8': ['S', 'S', 'S', 'S', 'D', 'S', 'S', 'S', 'S', 'S'],
+            'A,7': ['D', 'D', 'D', 'D', 'D', 'S', 'S', 'H', 'H', 'H'],
+            'A,6': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,5': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,4': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,3': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            'A,2': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+        },
+        pairs: {
+            'As': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            '10s': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            '9s': ['P', 'P', 'P', 'P', 'P', 'S', 'P', 'P', 'S', 'S'],
+            '8s': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            '7s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            '6s': ['P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
+            '5s': ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H', 'H'],
+            '4s': ['H', 'H', 'H', 'P', 'P', 'H', 'H', 'H', 'H', 'H'],
+            '3s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+            '2s': ['P', 'P', 'P', 'P', 'P', 'P', 'H', 'H', 'H', 'H'],
+        }
+    };
+
+    const getPlayerHandKeyForChart = useCallback((hand) => {
+        if (!hand || hand.length === 0) return null;
+        const { score, isSoft } = calculateScore(hand);
+        const ranks = hand.map(card => card.rank);
+
+        if (hand.length === 2 && ranks[0] === ranks[1]) {
+            const normalizedRank = ['J', 'Q', 'K'].includes(ranks[0]) ? '10' : ranks[0];
+            return `${normalizedRank}s`;
+        }
+        if (isSoft) {
+            if (score >= 20) return 'A,9';
+            if (score === 19) return 'A,8';
+            if (score === 18) return 'A,7';
+            if (score === 17) return 'A,6';
+            if (score === 16) return 'A,5';
+            if (score === 15) return 'A,4';
+            if (score === 14) return 'A,3';
+            if (score === 13) return 'A,2';
+        }
+        if (score >= 17) return '17+';
+        if (score >= 5 && score <= 7) return '7-';
+        return `${score}`;
+    }, [calculateScore]);
+
+    const getDealerUpCardKeyForChart = useCallback((card) => {
+        if (!card) return null;
+        if (['J', 'Q', 'K'].includes(card.rank)) return '10';
+        if (card.rank === 'A') return 'A';
+        return card.rank;
+    }, []);
+
+    const playerKey = playerHand ? getPlayerHandKeyForChart(playerHand) : null;
+    const dealerKey = dealerUpCard ? getDealerUpCardKeyForChart(dealerUpCard) : null;
+
+    const getActionColorClass = (action) => {
+        switch (action) {
+            case 'H': return 'bg-green-700 text-white';
+            case 'S': return 'bg-red-700 text-white';
+            case 'D': return 'bg-orange-700 text-white';
+            case 'P': return 'bg-blue-900 text-white';
+            default: return 'bg-gray-700 text-gray-100';
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-gray-800 p-4 rounded-xl shadow-2xl w-full max-w-sm md:max-w-xl max-h-[95vh] overflow-y-auto text-gray-100 relative" onClick={e => e.stopPropagation()}>
+                <button
+                    onClick={onClose}
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Basic Strategy Chart</h2>
+
+                <div className="space-y-6">
+                    {/* Hard Totals */}
+                    <div>
+                        <h3 className="text-lg font-semibold mb-2 text-yellow-300">Hard Totals</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {hardTotals.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.hard[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Soft Totals */}
+                    <div>
+                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Soft Totals</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {softTotals.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.soft[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pairs */}
+                    <div>
+                        <h3 className="text-xl font-semibold mb-2 text-yellow-300">Pairs</h3>
+                        <table className="w-full table-fixed border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-700">
+                                    <th className="p-1 text-center w-1/12">P</th>
+                                    {dealerRanks.map(rank => (
+                                        <th key={rank} className="p-1 text-center w-[8.8%]">{rank}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pairs.slice().reverse().map(playerTotal => (
+                                    <tr key={playerTotal} className="odd:bg-gray-700 even:bg-gray-900">
+                                        <td className="p-1 text-center font-bold">{playerTotal}</td>
+                                        {dealerRanks.map((dealerRank, colIndex) => {
+                                            const isHighlighted = (playerKey === playerTotal && dealerKey === dealerRank);
+                                            const cellValue = strategyData.pairs[playerTotal][colIndex];
+                                            return (
+                                                <td key={dealerRank} className={`p-1 text-center font-semibold
+                                                    ${getActionColorClass(cellValue)}
+                                                    ${isHighlighted ? 'border-4 border-yellow-300' : ''}`}>
+                                                    {cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ===================================================================================
+// --- 1. ADVANCED BLACKJACK COUNTER COMPONENT ---
 // ===================================================================================
 
 const BlackjackCounter = ({ onGoBack }) => {
