@@ -11,9 +11,10 @@ const BlackjackCounter = ({ onGoBack }) => {
     const [cardsPlayed, setCardsPlayed] = useState(0);
     const [cardsPlayedByRank, setCardsPlayedByRank] = useState({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
     const [history, setHistory] = useState([]);
+    const [chartData, setChartData] = useState([]); // State specifically for the chart
     const [showDeckSelector, setShowDeckSelector] = useState(false);
-    const [tableMinBet, setTableMinBet] = useState(10); // Renamed from betUnit
-    const [activeKey, setActiveKey] = useState(null); // For keyboard feedback
+    const [tableMinBet, setTableMinBet] = useState(10);
+    const [activeKey, setActiveKey] = useState(null);
 
     // --- REFS ---
     const chartCanvasRef = useRef(null);
@@ -46,6 +47,7 @@ const BlackjackCounter = ({ onGoBack }) => {
         setCardsPlayed(0);
         setCardsPlayedByRank({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
         setHistory([]);
+        setChartData([]); // Reset chart data
     }, []);
 
     const handleDeckChange = (newDeckCount) => {
@@ -59,21 +61,31 @@ const BlackjackCounter = ({ onGoBack }) => {
 
         const countValueMap = { '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 0, '8': 0, '9': 0, 'T': -1, 'A': -1 };
         const countValue = countValueMap[rank];
+        
+        const newRunningCount = runningCount + countValue;
+        const newCardsPlayed = cardsPlayed + 1;
+        
+        // Calculate new true count for chart data
+        const cardsRemaining = (numDecks * 52) - newCardsPlayed;
+        const decksRemaining = cardsRemaining > 0 ? cardsRemaining / 52 : 1;
+        const newTrueCount = newRunningCount / decksRemaining;
 
-        setHistory(prev => [...prev, { rank, countValue }]);
-        setRunningCount(prev => prev + countValue);
-        setCardsPlayed(prev => prev + 1);
+        setHistory(prev => [...prev, { rank, countValue, runningCount, cardsPlayed, cardsPlayedByRank }]);
+        setChartData(prev => [...prev, { rc: newRunningCount, tc: newTrueCount }]);
+        setRunningCount(newRunningCount);
+        setCardsPlayed(newCardsPlayed);
         setCardsPlayedByRank(prev => ({ ...prev, [rank]: prev[rank] + 1 }));
-    }, [cardsPlayed, TOTAL_CARDS]);
+    }, [cardsPlayed, TOTAL_CARDS, runningCount, numDecks]);
 
     const undoLastAction = useCallback(() => {
         if (history.length === 0) return;
-        const lastAction = history[history.length - 1];
+        const lastState = history[history.length - 1];
         
-        setRunningCount(prev => prev - lastAction.countValue);
-        setCardsPlayed(prev => prev - 1);
-        setCardsPlayedByRank(prev => ({ ...prev, [lastAction.rank]: prev[lastAction.rank] - 1 }));
+        setRunningCount(lastState.runningCount);
+        setCardsPlayed(lastState.cardsPlayed);
+        setCardsPlayedByRank(lastState.cardsPlayedByRank);
         setHistory(prev => prev.slice(0, -1));
+        setChartData(prev => prev.slice(0, -1));
     }, [history]);
 
     // --- BET SPREAD LOGIC ---
@@ -222,15 +234,12 @@ const BlackjackCounter = ({ onGoBack }) => {
 
     useEffect(() => {
         if (chartInstanceRef.current) {
-            const currentTrueCount = calculateTrueCount();
-            const allData = [...history, { rc: runningCount, tc: currentTrueCount }];
-            
-            chartInstanceRef.current.data.labels = allData.map((_, index) => index);
-            chartInstanceRef.current.data.datasets[0].data = allData.map(d => d.rc);
-            chartInstanceRef.current.data.datasets[1].data = allData.map(d => d.tc);
+            chartInstanceRef.current.data.labels = chartData.map((_, index) => index + 1);
+            chartInstanceRef.current.data.datasets[0].data = chartData.map(d => d.rc);
+            chartInstanceRef.current.data.datasets[1].data = chartData.map(d => d.tc);
             chartInstanceRef.current.update('none');
         }
-    }, [runningCount, history, calculateTrueCount]);
+    }, [chartData]);
 
     const trueCountColor = trueCount >= 2 ? '#34c759' : trueCount <= -1 ? '#ff3b30' : '#e0e0e0';
     const cardRanks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T'];
