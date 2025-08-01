@@ -266,7 +266,7 @@ const BlackjackCounter = ({ onGoBack }) => {
                     margin-bottom: 1rem;
                     position: relative;
                 }
-                .bjc-header-right { display: flex; gap: 0.5rem; }
+                .bjc-header-right { display: flex; gap: 0.5rem; align-items: center; }
                 .bjc-title { font-size: 1.5rem; font-weight: 700; color: #ffffff; }
                 .bjc-header-button {
                   background-color: #3a3a3c;
@@ -382,8 +382,8 @@ const BlackjackCounter = ({ onGoBack }) => {
                 
                 .bjc-rank-grid {
                     display: grid;
-                    grid-template-columns: 1fr;
-                    gap: 0.5rem;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 0.5rem 1.5rem;
                 }
                 .bjc-rank-item {
                     display: flex;
@@ -416,26 +416,32 @@ const BlackjackCounter = ({ onGoBack }) => {
                     color: #ff9500;
                     font-weight: 600;
                 }
-
-                .bjc-bankroll-panel {
-                    grid-column: 1 / -1;
+                
+                .bjc-header-input-group {
+                  display: flex;
+                  align-items: center;
+                  background-color: #3a3a3c;
+                  border-radius: 10px;
+                  padding: 0 0.5rem;
+                  color: #8e8e93;
                 }
-                .bjc-bankroll-input-group {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 0.5rem;
+                .bjc-header-input {
+                  background-color: transparent;
+                  border: none;
+                  color: white;
+                  width: 50px;
+                  text-align: center;
+                  font-weight: 600;
+                  padding: 0.5rem 0.2rem;
+                  font-size: 1rem;
                 }
-                .bjc-bankroll-input {
-                    background-color: #3a3a3c;
-                    border: 1px solid #555;
-                    color: white;
-                    font-size: 1.2rem;
-                    font-weight: bold;
-                    border-radius: 8px;
-                    width: 120px;
-                    padding: 0.5rem;
-                    text-align: center;
+                .bjc-header-input::-webkit-outer-spin-button,
+                .bjc-header-input::-webkit-inner-spin-button {
+                  -webkit-appearance: none;
+                  margin: 0;
+                }
+                .bjc-header-input[type=number] {
+                  -moz-appearance: textfield;
                 }
                 
                 .bjc-chart-panel {
@@ -452,6 +458,22 @@ const BlackjackCounter = ({ onGoBack }) => {
                 <div className="bjc-header" ref={deckSelectorRef}>
                     <h1 className="bjc-title">Pro Counter</h1>
                     <div className="bjc-header-right">
+                       <div className="bjc-header-input-group">
+                           <span>$</span>
+                           <input 
+                               type="text"
+                               pattern="[0-9]*"
+                               inputMode="numeric"
+                               value={tableMinBet} 
+                               onChange={(e) => {
+                                   const value = e.target.value;
+                                   if (/^\d*$/.test(value)) {
+                                       setTableMinBet(value === '' ? 0 : parseInt(value, 10));
+                                   }
+                               }}
+                               className="bjc-header-input"
+                           />
+                       </div>
                        <button className="bjc-header-button" onClick={() => setShowDeckSelector(!showDeckSelector)}>
                            {numDecks}D
                        </button>
@@ -493,18 +515,6 @@ const BlackjackCounter = ({ onGoBack }) => {
                         )}
                     </div>
                     
-                    <div className="bjc-panel bjc-bankroll-panel">
-                        <div className="bjc-bankroll-input-group">
-                            <label className="bjc-count-label">Table Minimum Bet</label>
-                            <input 
-                                type="number" 
-                                value={tableMinBet} 
-                                onChange={(e) => setTableMinBet(parseInt(e.target.value) || 0)} 
-                                className="bjc-bankroll-input"
-                            />
-                        </div>
-                    </div>
-
                     <div className="bjc-panel bjc-card-input">
                         <div className="bjc-panel-title">Card Input</div>
                         <div className="bjc-card-keypad">
