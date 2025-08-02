@@ -10,11 +10,15 @@ const BlackjackCounter = ({ onGoBack }) => {
     const [runningCount, setRunningCount] = useState(0);
     const [cardsPlayed, setCardsPlayed] = useState(0);
     const [cardsPlayedByRank, setCardsPlayedByRank] = useState({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
+    const [lowCardsPlayed, setLowCardsPlayed] = useState(0);
+    const [neutralCardsPlayed, setNeutralCardsPlayed] = useState(0);
+    const [highCardsPlayed, setHighCardsPlayed] = useState(0);
     const [history, setHistory] = useState([]);
     const [chartData, setChartData] = useState([]); // State specifically for the chart
     const [showDeckSelector, setShowDeckSelector] = useState(false);
     const [tableMinBet, setTableMinBet] = useState(10);
     const [activeKey, setActiveKey] = useState(null);
+    const [inputMode, setInputMode] = useState('advanced'); // 'simple' or 'advanced'
 
     // --- REFS ---
     const chartCanvasRef = useRef(null);
@@ -22,7 +26,7 @@ const BlackjackCounter = ({ onGoBack }) => {
     const deckSelectorRef = useRef(null);
 
     // --- DERIVED CONSTANTS & CALCULATIONS ---
-    const { TOTAL_CARDS, CARDS_PER_RANK, TOTAL_ACES } = useMemo(() => {
+    const { TOTAL_CARDS, CARDS_PER_RANK, TOTAL_ACES, INITIAL_LOW_CARDS, INITIAL_NEUTRAL_CARDS, INITIAL_HIGH_CARDS } = useMemo(() => {
         const CARDS_PER_DECK = 52;
         return {
             TOTAL_CARDS: numDecks * CARDS_PER_DECK,
@@ -30,6 +34,9 @@ const BlackjackCounter = ({ onGoBack }) => {
                 '2': 4 * numDecks, '3': 4 * numDecks, '4': 4 * numDecks, '5': 4 * numDecks, '6': 4 * numDecks, '7': 4 * numDecks, '8': 4 * numDecks, '9': 4 * numDecks, 'T': 16 * numDecks, 'A': 4 * numDecks
             },
             TOTAL_ACES: 4 * numDecks,
+            INITIAL_LOW_CARDS: 20 * numDecks,
+            INITIAL_NEUTRAL_CARDS: 12 * numDecks,
+            INITIAL_HIGH_CARDS: 20 * numDecks,
         };
     }, [numDecks]);
 
@@ -46,8 +53,11 @@ const BlackjackCounter = ({ onGoBack }) => {
         setRunningCount(0);
         setCardsPlayed(0);
         setCardsPlayedByRank({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
+        setLowCardsPlayed(0);
+        setNeutralCardsPlayed(0);
+        setHighCardsPlayed(0);
         setHistory([]);
-        setChartData([]); // Reset chart data
+        setChartData([]);
     }, []);
 
     const handleDeckChange = (newDeckCount) => {
@@ -56,26 +66,45 @@ const BlackjackCounter = ({ onGoBack }) => {
         setShowDeckSelector(false);
     };
 
-    const handleCard = useCallback((rank) => {
+    const handleCard = useCallback((value) => {
         if (cardsPlayed >= TOTAL_CARDS) return;
-
-        const countValueMap = { '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 0, '8': 0, '9': 0, 'T': -1, 'A': -1 };
-        const countValue = countValueMap[rank];
-        
+    
+        let countValue;
+        let rank = null;
+        let group = null;
+    
+        if (inputMode === 'advanced') {
+            const countValueMap = { '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 0, '8': 0, '9': 0, 'T': -1, 'A': -1 };
+            countValue = countValueMap[value];
+            rank = value;
+        } else {
+            countValue = value;
+            if (value === 1) group = 'low';
+            else if (value === 0) group = 'neutral';
+            else if (value === -1) group = 'high';
+        }
+    
         const newRunningCount = runningCount + countValue;
         const newCardsPlayed = cardsPlayed + 1;
         
-        // Calculate new true count for chart data
         const cardsRemaining = (numDecks * 52) - newCardsPlayed;
         const decksRemaining = cardsRemaining > 0 ? cardsRemaining / 52 : 1;
         const newTrueCount = newRunningCount / decksRemaining;
-
-        setHistory(prev => [...prev, { rank, countValue, runningCount, cardsPlayed, cardsPlayedByRank }]);
+    
+        setHistory(prev => [...prev, { rank, group, countValue, runningCount, cardsPlayed, cardsPlayedByRank, lowCardsPlayed, neutralCardsPlayed, highCardsPlayed }]);
         setChartData(prev => [...prev, { rc: newRunningCount, tc: newTrueCount }]);
         setRunningCount(newRunningCount);
         setCardsPlayed(newCardsPlayed);
-        setCardsPlayedByRank(prev => ({ ...prev, [rank]: prev[rank] + 1 }));
-    }, [cardsPlayed, TOTAL_CARDS, runningCount, numDecks]);
+    
+        if (inputMode === 'advanced' && rank) {
+            setCardsPlayedByRank(prev => ({ ...prev, [rank]: prev[rank] + 1 }));
+        } else if (inputMode === 'simple') {
+            if (group === 'low') setLowCardsPlayed(p => p + 1);
+            else if (group === 'neutral') setNeutralCardsPlayed(p => p + 1);
+            else if (group === 'high') setHighCardsPlayed(p => p + 1);
+        }
+    
+    }, [cardsPlayed, TOTAL_CARDS, runningCount, numDecks, inputMode, cardsPlayedByRank, lowCardsPlayed, neutralCardsPlayed, highCardsPlayed]);
 
     const undoLastAction = useCallback(() => {
         if (history.length === 0) return;
@@ -84,6 +113,9 @@ const BlackjackCounter = ({ onGoBack }) => {
         setRunningCount(lastState.runningCount);
         setCardsPlayed(lastState.cardsPlayed);
         setCardsPlayedByRank(lastState.cardsPlayedByRank);
+        setLowCardsPlayed(lastState.lowCardsPlayed);
+        setNeutralCardsPlayed(lastState.neutralCardsPlayed);
+        setHighCardsPlayed(lastState.highCardsPlayed);
         setHistory(prev => prev.slice(0, -1));
         setChartData(prev => prev.slice(0, -1));
     }, [history]);
@@ -93,7 +125,7 @@ const BlackjackCounter = ({ onGoBack }) => {
         const playerAdvantage = (trueCount - 1) * 0.005;
 
         if (playerAdvantage <= 0) {
-            return { recommendedBet: 0, advantage: 0 }; // No advantage, don't bet.
+            return { recommendedBet: 0, advantage: 0 };
         }
         
         const betAmount = (trueCount - 1) * tableMinBet;
@@ -154,14 +186,16 @@ const BlackjackCounter = ({ onGoBack }) => {
                 return;
             }
 
-            const keyMap = {
-                '1': 'A', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '0': 'T'
-            };
-            const rank = keyMap[e.key];
-            if (rank) {
-                handleCard(rank);
-                setActiveKey(rank);
-                setTimeout(() => setActiveKey(null), 150);
+            if (inputMode === 'advanced') {
+                const keyMap = {
+                    '1': 'A', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '0': 'T'
+                };
+                const rank = keyMap[e.key];
+                if (rank) {
+                    handleCard(rank);
+                    setActiveKey(rank);
+                    setTimeout(() => setActiveKey(null), 150);
+                }
             }
         };
 
@@ -171,7 +205,7 @@ const BlackjackCounter = ({ onGoBack }) => {
             document.removeEventListener("mousedown", handleClickOutside);
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [handleCard, undoLastAction]);
+    }, [handleCard, undoLastAction, inputMode]);
 
     // --- Chart Logic ---
     useEffect(() => {
@@ -328,11 +362,22 @@ const BlackjackCounter = ({ onGoBack }) => {
                     padding: 1rem;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
                 }
+                .bjc-panel-title-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: baseline;
+                    margin-bottom: 1rem;
+                }
                 .bjc-panel-title {
                     font-size: 1rem;
                     color: #8e8e93;
-                    margin-bottom: 1rem;
+                    margin-bottom: 0;
                     text-align: left;
+                    font-weight: 600;
+                }
+                .bjc-panel-subtitle {
+                    font-size: 0.8rem;
+                    color: #8e8e93;
                     font-weight: 600;
                 }
 
@@ -375,6 +420,11 @@ const BlackjackCounter = ({ onGoBack }) => {
                 .bjc-keypad-button.active {
                     transform: scale(0.9);
                     background-color: #007aff;
+                }
+                 .bjc-simple-buttons {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 0.5rem;
                 }
 
                 .bjc-remaining-cards { grid-column: 1 / 2; }
@@ -447,6 +497,57 @@ const BlackjackCounter = ({ onGoBack }) => {
                 .bjc-chart-panel {
                     grid-column: 1 / -1;
                 }
+                
+                .bjc-input-toggle {
+                    display: flex;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                }
+                .bjc-toggle-label {
+                    font-size: 0.8rem;
+                    color: #8e8e93;
+                }
+                .bjc-toggle-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 40px;
+                    height: 22px;
+                }
+                .bjc-toggle-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .bjc-slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #3a3a3c;
+                    transition: .4s;
+                    border-radius: 22px;
+                }
+                .bjc-slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 18px;
+                    width: 18px;
+                    left: 2px;
+                    bottom: 2px;
+                    background-color: white;
+                    transition: .4s;
+                    border-radius: 50%;
+                }
+                input:checked + .bjc-slider {
+                    background-color: #34c759;
+                }
+                input:checked + .bjc-slider:before {
+                    transform: translateX(18px);
+                }
 
                 @media (max-width: 640px) {
                     .bjc-main-grid { grid-template-columns: 1fr; }
@@ -516,18 +617,38 @@ const BlackjackCounter = ({ onGoBack }) => {
                     </div>
                     
                     <div className="bjc-panel bjc-card-input">
-                        <div className="bjc-panel-title">Card Input</div>
-                        <div className="bjc-card-keypad">
-                            {cardRanks.map(rank => (
-                                <button 
-                                    key={rank} 
-                                    className={`bjc-keypad-button ${activeKey === rank ? 'active' : ''}`} 
-                                    onClick={() => handleCard(rank)}
-                                >
-                                    {rank}
-                                </button>
-                            ))}
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            <div className="bjc-panel-title" style={{marginBottom: 0}}>Card Input</div>
+                            <div className="bjc-input-toggle">
+                                <span className="bjc-toggle-label">Simple</span>
+                                <label className="bjc-toggle-switch">
+                                    <input type="checkbox" checked={inputMode === 'advanced'} onChange={() => setInputMode(prev => prev === 'simple' ? 'advanced' : 'simple')} />
+                                    <span className="bjc-slider"></span>
+                                </label>
+                                <span className="bjc-toggle-label">Advanced</span>
+                            </div>
                         </div>
+                        <hr style={{borderColor: '#3a3a3c', margin: '0.75rem 0'}} />
+
+                        {inputMode === 'advanced' ? (
+                            <div className="bjc-card-keypad">
+                                {cardRanks.map(rank => (
+                                    <button 
+                                        key={rank} 
+                                        className={`bjc-keypad-button ${activeKey === rank ? 'active' : ''}`} 
+                                        onClick={() => handleCard(rank)}
+                                    >
+                                        {rank}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bjc-simple-buttons">
+                                <button className="bjc-keypad-button" style={{backgroundColor: '#34c759'}} onClick={() => handleCard(1)}>+1</button>
+                                <button className="bjc-keypad-button" style={{backgroundColor: '#5856d6'}} onClick={() => handleCard(0)}>0</button>
+                                <button className="bjc-keypad-button" style={{backgroundColor: '#ff3b30'}} onClick={() => handleCard(-1)}>-1</button>
+                            </div>
+                        )}
                         <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.5rem'}}>
                             <button className="bjc-keypad-button" style={{flexGrow: 1}} onClick={undoLastAction}>Undo</button>
                             <button className="bjc-keypad-button" style={{flexGrow: 1}} onClick={resetAll}>Reset</button>
@@ -535,23 +656,34 @@ const BlackjackCounter = ({ onGoBack }) => {
                     </div>
 
                     <div className="bjc-panel bjc-remaining-cards">
-                        <div className="bjc-panel-title">Remaining Cards</div>
-                        <div className="bjc-rank-grid">
-                            {cardRanks.map(rank => {
-                                const remaining = CARDS_PER_RANK[rank] - cardsPlayedByRank[rank];
-                                const totalRemaining = TOTAL_CARDS - cardsPlayed;
-                                const percentage = totalRemaining > 0 ? (remaining / totalRemaining) * 100 : 0;
-                                return (
-                                    <div key={rank} className="bjc-rank-item">
-                                        <div className="bjc-rank-info">
-                                            <span>{rank}:</span>
-                                            <span>{remaining}/{CARDS_PER_RANK[rank]}</span>
-                                        </div>
-                                        <span className="bjc-rank-percent">{percentage.toFixed(1)}%</span>
-                                    </div>
-                                )
-                            })}
+                        <div className="bjc-panel-title-container">
+                            <div className="bjc-panel-title">Remaining Cards</div>
+                            <div className="bjc-panel-subtitle">{cardsPlayed} / {TOTAL_CARDS} Played</div>
                         </div>
+                        {inputMode === 'advanced' ? (
+                            <div className="bjc-rank-grid">
+                                {cardRanks.map(rank => {
+                                    const remaining = CARDS_PER_RANK[rank] - cardsPlayedByRank[rank];
+                                    const totalRemaining = TOTAL_CARDS - cardsPlayed;
+                                    const percentage = totalRemaining > 0 ? (remaining / totalRemaining) * 100 : 0;
+                                    return (
+                                        <div key={rank} className="bjc-rank-item">
+                                            <div className="bjc-rank-info">
+                                                <span>{rank}:</span>
+                                                <span>{remaining}/{CARDS_PER_RANK[rank]}</span>
+                                            </div>
+                                            <span className="bjc-rank-percent">{percentage.toFixed(1)}%</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                           <div className="bjc-rank-grid" style={{gridTemplateColumns: '1fr'}}>
+                               <div className="bjc-rank-item"><span>Low (2-6):</span> <span>{INITIAL_LOW_CARDS - lowCardsPlayed}/{INITIAL_LOW_CARDS}</span></div>
+                               <div className="bjc-rank-item"><span>Neutral (7-9):</span> <span>{INITIAL_NEUTRAL_CARDS - neutralCardsPlayed}/{INITIAL_NEUTRAL_CARDS}</span></div>
+                               <div className="bjc-rank-item"><span>High (10-A):</span> <span>{INITIAL_HIGH_CARDS - highCardsPlayed}/{INITIAL_HIGH_CARDS}</span></div>
+                           </div>
+                        )}
                     </div>
 
                     <div className="bjc-panel bjc-deviations">
