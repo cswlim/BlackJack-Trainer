@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import BlackjackTrainer from './features/StrategyTrainer/StrategyTrainer'; // Corrected import path
+import React, { useState, useEffect } from 'react';
+import BlackjackTrainer from './features/StrategyTrainer/StrategyTrainer';
 import BlackjackCounter from './features/CardCounter/BlackjackCounter';
 
 // Note: Global styles would typically go in a separate index.css file,
@@ -11,7 +11,6 @@ const GlobalStyles = () => (
         body {
             font-family: 'Nunito', sans-serif;
             overflow-x: hidden;
-            background-color: #121212; /* Ensure background is dark */
         }
         .font-mono {
             font-family: 'Roboto Mono', monospace;
@@ -52,3 +51,19 @@ export default function App() {
     if (gameMode === 'counting') {
         return <BlackjackCounter onGoBack={() => setGameMode(null)} />;
     }
+
+    // Default view: Mode Selection
+    return (
+        <>
+            <GlobalStyles />
+            <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 bg-gray-900`}>
+                <h1 className="text-4xl font-bold text-gray-100 transition-colors duration-300">Blackjack Trainer</h1>
+                <p className="text-gray-400 transition-colors duration-300 mb-8">Select your training mode.</p>
+                <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                    <button onClick={() => setGameMode('solo')} className="px-8 py-4 bg-blue-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-blue-600 transition">Strategy Trainer</button>
+                    <button onClick={() => setGameMode('counting')} className="px-8 py-4 bg-green-500 text-white font-semibold text-xl rounded-xl shadow-lg hover:bg-green-600 transition">Card Counter</button>
+                </div>
+            </div>
+        </>
+    );
+}
