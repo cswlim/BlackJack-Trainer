@@ -445,24 +445,14 @@ const BlackjackCounter = ({ onGoBack }) => {
                     display: grid;
                     grid-template-columns: .7fr .5fr 1fr;
                     gap: 0.75rem;
-                
                 }
                 .bjc-simple-buttons .bjc-keypad-button {
                     font-size: 1.5rem;
                     padding: 1.25rem;
                 }
-                .bjc-plus-button {
-                    flex: 0.9;
-                    background-color: #34c759;
-                }
-                .bjc-zero-button {
-                    flex: 0.7;
-                    background-color: #5856d6;
-                }
                 .bjc-minus-group {
                     display: flex;
                     gap: 0.75rem;
-                    flex: 1;
                 }
                 .bjc-minus-button {
                     flex: 3.5;
@@ -606,6 +596,8 @@ const BlackjackCounter = ({ onGoBack }) => {
                     .bjc-main-grid { grid-template-columns: 1fr; }
                     .bjc-counts-display { flex-direction: column; gap: 1rem; }
                     .bjc-remaining-cards, .bjc-deviations { grid-column: 1 / -1; }
+                    .bjc-title { display: none; }
+                    .bjc-header { justify-content: center; }
                 }
             `}</style>
             <div className="bjc-app-container">
@@ -701,8 +693,8 @@ const BlackjackCounter = ({ onGoBack }) => {
                             </div>
                         ) : (
                             <div className="bjc-simple-buttons">
-                                <button className="bjc-keypad-button bjc-plus-button" onClick={() => handleCard(1)}>+1</button>
-                                <button className="bjc-keypad-button bjc-zero-button" onClick={() => handleCard(0)}>0</button>
+                                <button className="bjc-keypad-button" style={{backgroundColor: '#34c759'}} onClick={() => handleCard(1)}>+1</button>
+                                <button className="bjc-keypad-button" style={{backgroundColor: '#5856d6'}} onClick={() => handleCard(0)}>0</button>
                                 <div className="bjc-minus-group">
                                     <button className="bjc-keypad-button bjc-minus-button" onClick={() => handleCard(-1)}>-1</button>
                                     <button className="bjc-keypad-button bjc-ace-button" onClick={() => handleCard(-1, true)}>A</button>
