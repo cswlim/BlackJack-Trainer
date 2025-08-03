@@ -443,8 +443,9 @@ const BlackjackCounter = ({ onGoBack }) => {
                 }
                  .bjc-simple-buttons {
                     display: grid;
-                    grid-template-columns: .8fr .6fr 1fr;
+                    grid-template-columns: .7fr .5fr 1fr;
                     gap: 0.75rem;
+                
                 }
                 .bjc-simple-buttons .bjc-keypad-button {
                     font-size: 1.5rem;
