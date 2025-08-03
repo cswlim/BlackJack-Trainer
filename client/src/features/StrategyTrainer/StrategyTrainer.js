@@ -1,766 +1,938 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Card from '../../components/Card';
+import HistoryTracker from '../../components/HistoryTracker';
+import StreakCounter from '../../components/StreakCounter';
+import BasicStrategyModal from '../../components/BasicStrategyModal';
+import CountPromptModal from '../../components/CountPromptModal';
+import { getBasicStrategy, getCardCountValue } from '../../utils/blackjackLogic';
 
-// ===================================================================================
-// --- Professional Blackjack Counter Component ---
-// ===================================================================================
+const BlackjackTrainer = ({ onGoBack }) => {
+    const [trainerMode, setTrainerMode] = useState(null);
+    const NUM_DECKS = 6;
 
-const BlackjackCounter = ({ onGoBack }) => {
-    // --- STATE MANAGEMENT ---
-    const [numDecks, setNumDecks] = useState(8);
+    const [deck, setDeck] = useState([]);
+    const [cutCardPosition, setCutCardPosition] = useState(0);
+    const [isCutCardRevealed, setIsCutCardRevealed] = useState(false);
+    const [gameState, setGameState] = useState('pre-game');
+    
+    const [playerHands, setPlayerHands] = useState([]);
+    const [activeHandIndex, setActiveHandIndex] = useState(0);
+    const [dealerHand, setDealerHand] = useState({ cards: [] });
+    
     const [runningCount, setRunningCount] = useState(0);
-    const [cardsPlayed, setCardsPlayed] = useState(0);
-    const [cardsPlayedByRank, setCardsPlayedByRank] = useState({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
-    const [lowCardsPlayed, setLowCardsPlayed] = useState(0);
-    const [neutralCardsPlayed, setNeutralCardsPlayed] = useState(0);
-    const [highCardsPlayed, setHighCardsPlayed] = useState(0);
-    const [acesPlayed, setAcesPlayed] = useState(0);
+    const [showCountPrompt, setShowCountPrompt] = useState(false);
+    const [pendingPlayerAction, setPendingPlayerAction] = useState(null);
+
+    const [message, setMessage] = useState('Select a game mode to start.');
+    const [feedback, setFeedback] = useState('');
+    const [isFeedbackCorrect, setIsFeedbackCorrect] = useState(false);
     const [history, setHistory] = useState([]);
-    const [chartData, setChartData] = useState([]); // State specifically for the chart
-    const [showDeckSelector, setShowDeckSelector] = useState(false);
-    const [tableMinBet, setTableMinBet] = useState(10);
-    const [activeKey, setActiveKey] = useState(null);
-    const [inputMode, setInputMode] = useState('simple'); // Default to simple mode
+    const [correctCount, setCorrectCount] = useState(0);
+    const [incorrectCount, setIncorrectCount] = useState(0);
+    const [winCount, setWinCount] = useState(0);
+    const [lossCount, setLossCount] = useState(0);
+    const [pushCount, setPushCount] = useState(0);
+    const [playerBjCount, setPlayerBjCount] = useState(0);
+    const [dealerBjCount, setDealerBjCount] = useState(0);
+    const [streakCount, setStreakCount] = useState(0);
+    const [isActionDisabled, setIsActionDisabled] = useState(false);
+    const lastActionFeedback = useRef('');
+    const endOfRoundMessageSet = useRef(false);
+    const [showChartModal, setShowChartModal] = useState(false);
 
-    // --- REFS ---
-    const chartCanvasRef = useRef(null);
-    const chartInstanceRef = useRef(null);
-    const deckSelectorRef = useRef(null);
+    // State for new animations
+    const [announcement, setAnnouncement] = useState(null);
+    const [burstKey, setBurstKey] = useState(0);
+    const [burstAnimClass, setBurstAnimClass] = useState('');
+    const [washAwayKey, setWashAwayKey] = useState(0);
+    const [showWashAway, setShowWashAway] = useState(false);
 
-    // --- DERIVED CONSTANTS & CALCULATIONS ---
-    const { TOTAL_CARDS, CARDS_PER_RANK, TOTAL_ACES, INITIAL_LOW_CARDS, INITIAL_NEUTRAL_CARDS, INITIAL_HIGH_CARDS } = useMemo(() => {
-        const CARDS_PER_DECK = 52;
-        return {
-            TOTAL_CARDS: numDecks * CARDS_PER_DECK,
-            CARDS_PER_RANK: {
-                '2': 4 * numDecks, '3': 4 * numDecks, '4': 4 * numDecks, '5': 4 * numDecks, '6': 4 * numDecks, '7': 4 * numDecks, '8': 4 * numDecks, '9': 4 * numDecks, 'T': 16 * numDecks, 'A': 4 * numDecks
-            },
-            TOTAL_ACES: 4 * numDecks,
-            INITIAL_LOW_CARDS: 20 * numDecks,
-            INITIAL_NEUTRAL_CARDS: 12 * numDecks,
-            INITIAL_HIGH_CARDS: 20 * numDecks,
-        };
-    }, [numDecks]);
 
-    const trueCount = useMemo(() => {
-        const CARDS_PER_DECK = 52;
-        const cardsRemaining = TOTAL_CARDS - cardsPlayed;
-        if (cardsRemaining === 0) return 0;
-        const decksRemaining = cardsRemaining / CARDS_PER_DECK;
-        return runningCount / decksRemaining;
-    }, [runningCount, cardsPlayed, TOTAL_CARDS]);
+    const createShoe = useCallback(() => {
+        const suits = ['♠', '♣', '♥', '♦'];
+        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        let newDeck = [];
+        for (let i = 0; i < NUM_DECKS; i++) {
+            for (const suit of suits) {
+                for (const rank of ranks) {
+                    newDeck.push({ suit, rank });
+                }
+            }
+        }
+        for (let i = newDeck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
+        }
+        
+        const min = Math.floor(newDeck.length * 0.72);
+        const max = Math.floor(newDeck.length * 0.78);
+        setCutCardPosition(Math.floor(Math.random() * (max - min + 1)) + min);
 
-    // --- CORE LOGIC ---
-    const resetAll = useCallback(() => {
+        setDeck(newDeck);
         setRunningCount(0);
-        setCardsPlayed(0);
-        setCardsPlayedByRank({ '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, 'T': 0, 'A': 0 });
-        setLowCardsPlayed(0);
-        setNeutralCardsPlayed(0);
-        setHighCardsPlayed(0);
-        setAcesPlayed(0);
-        setHistory([]);
-        setChartData([]);
+        setIsCutCardRevealed(false);
     }, []);
 
-    const handleDeckChange = (newDeckCount) => {
-        setNumDecks(newDeckCount);
-        resetAll();
-        setShowDeckSelector(false);
-    };
+    const calculateScore = useCallback((hand) => {
+        let scoreWithoutAces = 0;
+        let aceCount = 0;
+        hand.forEach(card => {
+            if (!card) return;
+            if (card.rank === 'A') {
+                aceCount++;
+            } else if (['J', 'Q', 'K'].includes(card.rank)) {
+                scoreWithoutAces += 10;
+            } else {
+                scoreWithoutAces += parseInt(card.rank);
+            }
+        });
 
-    const handleCard = useCallback((value, isAce = false) => {
-        if (cardsPlayed >= TOTAL_CARDS) return;
-    
-        let countValue;
-        let rank = null;
-        let group = null;
-    
-        if (inputMode === 'advanced') {
-            const countValueMap = { '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 0, '8': 0, '9': 0, 'T': -1, 'A': -1 };
-            countValue = countValueMap[value];
-            rank = value;
-        } else { // Simple Mode
-            countValue = value;
-            if (value === 1) group = 'low';
-            else if (value === 0) group = 'neutral';
-            else if (value === -1) group = 'high';
+        if (aceCount === 0) {
+            return { score: scoreWithoutAces, isSoft: false, display: `${scoreWithoutAces}` };
         }
-    
-        const newRunningCount = runningCount + countValue;
-        const newCardsPlayed = cardsPlayed + 1;
+
+        const lowScore = scoreWithoutAces + aceCount;
+        const highScore = lowScore + 10;
         
-        const cardsRemaining = (numDecks * 52) - newCardsPlayed;
-        const decksRemaining = cardsRemaining > 0 ? cardsRemaining / 52 : 1;
-        const newTrueCount = newRunningCount / decksRemaining;
-    
-        setHistory(prev => [...prev, { rank, group, isAce, countValue, runningCount, cardsPlayed, cardsPlayedByRank, lowCardsPlayed, neutralCardsPlayed, highCardsPlayed, acesPlayed }]);
-        setChartData(prev => [...prev, { rc: newRunningCount, tc: newTrueCount }]);
-        setRunningCount(newRunningCount);
-        setCardsPlayed(newCardsPlayed);
-    
-        if (inputMode === 'advanced' && rank) {
-            setCardsPlayedByRank(prev => ({ ...prev, [rank]: prev[rank] + 1 }));
-        } 
+        if (highScore === 21 && hand.length === 2) {
+            return { score: 21, isSoft: false, display: 'Blackjack' };
+        }
+
+        if (highScore > 21) {
+            return { score: lowScore, isSoft: false, display: `${lowScore}` };
+        } else {
+            return { score: highScore, isSoft: true, display: `${lowScore} / ${highScore}` };
+        }
+    }, []);
+
+    const dealCard = useCallback((currentDeck) => {
+        if (currentDeck.length === 0) {
+            return { card: null, newDeck: [] };
+        }
+        const newDeck = [...currentDeck];
+        if (newDeck.length === cutCardPosition) {
+            setIsCutCardRevealed(true);
+        }
+        const card = newDeck.pop();
+        return { card, newDeck };
+    }, [cutCardPosition]);
+
+    const dealNewGame = useCallback(() => {
+        if (isCutCardRevealed) {
+            createShoe();
+            setTimeout(() => setGameState('pre-deal'), 100);
+            return;
+        }
+
+        endOfRoundMessageSet.current = false;
+        lastActionFeedback.current = '';
+        setMessage('');
+        setFeedback('');
+        setIsFeedbackCorrect(false);
+        setActiveHandIndex(0);
+
+        setDeck(prevDeck => {
+            let tempDeck = [...prevDeck];
+            if (tempDeck.length < 4) {
+                console.error("Not enough cards to deal a new game.");
+                return tempDeck;
+            }
+
+            const { card: playerCard1, newDeck: deck1 } = dealCard(tempDeck);
+            const { card: dealerCard1, newDeck: deck2 } = dealCard(deck1);
+            const { card: playerCard2, newDeck: deck3 } = dealCard(deck2);
+            const { card: dealerCard2, newDeck: deck4 } = dealCard(deck3);
+
+            const tempPlayerHand = [playerCard1, playerCard2];
+            const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+            const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
+
+            setPlayerHands([playerInitialState]);
+            setDealerHand({ cards: tempDealerHand });
+            
+            let newRunningCount = runningCount;
+            [playerCard1, dealerCard1, playerCard2, dealerCard2].forEach(c => {
+                newRunningCount += getCardCountValue(c);
+            });
+            setRunningCount(newRunningCount);
+
+            const playerHasBj = playerInitialState.score === 21;
+            const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
+            
+            if (playerHasBj || dealerHasBj) {
+                setGameState('end');
+            } else {
+                setGameState('player-turn');
+            }
+            
+            return deck4;
+        });
+    }, [isCutCardRevealed, createShoe, dealCard, calculateScore, runningCount]);
+
+    const executePlayerAction = useCallback((actionCode, actionName) => {
+        setIsActionDisabled(true);
+        const hands = playerHands;
+        const handIndex = activeHandIndex;
+        const handsUpdater = setPlayerHands;
+
+        const currentHandRef = hands[handIndex];
+        const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
         
-        // Always track groups in the background for seamless mode switching
-        if (rank) { // Advanced mode tracks groups via rank
-             if (['2','3','4','5','6'].includes(rank)) setLowCardsPlayed(p => p + 1);
-             else if (['7','8','9'].includes(rank)) setNeutralCardsPlayed(p => p + 1);
-             else if (['T', 'A'].includes(rank)) {
-                setHighCardsPlayed(p => p + 1);
-                if (rank === 'A') setAcesPlayed(p => p + 1);
-             }
-        } else { // Simple mode tracks groups directly
-            if (group === 'low') setLowCardsPlayed(p => p + 1);
-            else if (group === 'neutral') setNeutralCardsPlayed(p => p + 1);
-            else if (group === 'high') {
-                setHighCardsPlayed(p => p + 1);
-                if (isAce) {
-                    setAcesPlayed(p => p + 1);
+        const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
+        
+        const isCorrect = actionCode === correctMove;
+        
+        if (isCorrect) {
+            const newStreak = streakCount + 1;
+            setStreakCount(newStreak);
+            setCorrectCount(prev => prev + 1);
+            setIsFeedbackCorrect(true);
+            setFeedback('✅');
+            lastActionFeedback.current = "Correct!";
+
+            if ([100, 200, 300].includes(newStreak)) {
+                setAnnouncement(newStreak);
+            } else if (newStreak === 50) {
+                setBurstKey(k => k + 1);
+            }
+            setShowWashAway(false);
+        } else {
+            if (streakCount >= 2) {
+                setShowWashAway(true);
+                setWashAwayKey(k => k + 1);
+            }
+            setStreakCount(0);
+            setIncorrectCount(prev => prev + 1);
+            setIsFeedbackCorrect(false);
+            setFeedback(`❌ Correct move: ${correctMove}`);
+            lastActionFeedback.current = "Incorrect.";
+        }
+        
+        const historyItem = { text: `Hand ${currentHandRef.display}: Your move: ${actionName}. Strategy: ${correctMove}.`, correct: isCorrect };
+        setHistory(prevHistory => [historyItem, ...prevHistory]);
+
+
+        switch(actionCode) {
+            case 'H': {
+                const { card, newDeck } = dealCard(deck);
+                if(card) {
+                    setDeck(newDeck);
+                    setRunningCount(prev => prev + getCardCountValue(card));
+                    handsUpdater(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        newHands[handIndex].cards.push(card);
+                        Object.assign(newHands[handIndex], calculateScore(newHands[handIndex].cards));
+                        return newHands;
+                    });
                 }
+                break;
             }
-        }
-    
-    }, [cardsPlayed, TOTAL_CARDS, runningCount, numDecks, inputMode, cardsPlayedByRank, lowCardsPlayed, neutralCardsPlayed, highCardsPlayed, acesPlayed]);
-
-    const undoLastAction = useCallback(() => {
-        if (history.length === 0) return;
-        const lastState = history[history.length - 1];
-        
-        setRunningCount(lastState.runningCount);
-        setCardsPlayed(lastState.cardsPlayed);
-        setCardsPlayedByRank(lastState.cardsPlayedByRank);
-        setLowCardsPlayed(lastState.lowCardsPlayed);
-        setNeutralCardsPlayed(lastState.neutralCardsPlayed);
-        setHighCardsPlayed(lastState.highCardsPlayed);
-        setAcesPlayed(lastState.acesPlayed);
-        setHistory(prev => prev.slice(0, -1));
-        setChartData(prev => prev.slice(0, -1));
-    }, [history]);
-
-    // --- BET SPREAD LOGIC ---
-    const { recommendedBet, advantage } = useMemo(() => {
-        const playerAdvantage = (trueCount - 1) * 0.005;
-
-        if (playerAdvantage <= 0) {
-            return { recommendedBet: 0, advantage: 0 };
-        }
-        
-        const betAmount = (trueCount - 1) * tableMinBet;
-        
-        return { recommendedBet: Math.max(tableMinBet, betAmount), advantage: playerAdvantage };
-    }, [trueCount, tableMinBet]);
-
-    // --- PLAYING DEVIATIONS (ILLUSTRIOUS 18) ---
-    const playingDeviations = useMemo(() => {
-        const tc = trueCount;
-        const deviations = [];
-        const deviationChart = {
-            'Insurance': { index: 3, play: 'Take Insurance' },
-            '16v10': { index: 0, play: 'Stand' },
-            '15v10': { index: 4, play: 'Stand' },
-            '10v10': { index: 4, play: 'Double' },
-            '12v3': { index: 2, play: 'Stand' },
-            '12v2': { index: 3, play: 'Stand' },
-            '13v2': { index: -1, play: 'Stand' },
-            '11vA': { index: 1, play: 'Double' },
-            '9v2': { index: 1, play: 'Double' },
-            '10vA': { index: 4, play: 'Double' },
-            '9v7': { index: 3, play: 'Double' },
-            '16v9': { index: 5, play: 'Stand' },
-            '13v3': { index: -2, play: 'Stand' },
-        };
-
-        if (tc >= deviationChart['Insurance'].index) deviations.push(deviationChart['Insurance'].play);
-        if (tc >= deviationChart['16v10'].index) deviations.push('Stand 16 vs 10');
-        if (tc >= deviationChart['15v10'].index) deviations.push('Stand 15 vs 10');
-        if (tc >= deviationChart['10v10'].index) deviations.push('Double 10 vs 10');
-        if (tc >= deviationChart['12v3'].index) deviations.push('Stand 12 vs 3');
-        if (tc >= deviationChart['12v2'].index) deviations.push('Stand 12 vs 2');
-        if (tc <= deviationChart['13v2'].index) deviations.push('Stand 13 vs 2');
-        if (tc >= deviationChart['11vA'].index) deviations.push('Double 11 vs A');
-        if (tc >= deviationChart['9v2'].index) deviations.push('Double 9 vs 2');
-        if (tc >= deviationChart['10vA'].index) deviations.push('Double 10 vs A');
-        if (tc >= deviationChart['9v7'].index) deviations.push('Double 9 vs 7');
-        if (tc >= deviationChart['16v9'].index) deviations.push('Stand 16 vs 9');
-        if (tc <= deviationChart['13v3'].index) deviations.push('Stand 13 vs 3');
-
-        return deviations;
-    }, [trueCount]);
-
-
-    // --- Event Listeners ---
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (deckSelectorRef.current && !deckSelectorRef.current.contains(event.target)) {
-                setShowDeckSelector(false);
-            }
-        };
-
-        const handleKeyDown = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-                e.preventDefault();
-                undoLastAction();
-                return;
-            }
-
-            if (inputMode === 'advanced') {
-                const keyMap = {
-                    '1': 'A', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '0': 'T'
-                };
-                const rank = keyMap[e.key];
-                if (rank) {
-                    handleCard(rank);
-                    setActiveKey(rank);
-                    setTimeout(() => setActiveKey(null), 150);
-                }
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [handleCard, undoLastAction, inputMode]);
-
-    // --- Chart Logic ---
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-        script.async = true;
-        
-        script.onload = () => {
-            if (chartCanvasRef.current && window.Chart) {
-                const chartContext = chartCanvasRef.current.getContext('2d');
-                chartInstanceRef.current = new window.Chart(chartContext, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [{
-                            label: 'Running Count',
-                            data: [],
-                            borderColor: '#ffffff',
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.2,
-                            pointRadius: 0
-                        }, {
-                            label: 'True Count',
-                            data: [],
-                            borderColor: '#34c759',
-                            backgroundColor: 'rgba(52, 199, 89, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.2,
-                            pointRadius: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        animation: { duration: 0 },
-                        scales: {
-                            y: { beginAtZero: false, ticks: { color: '#8e8e93' }, grid: { color: '#3a3a3c' } },
-                            x: { ticks: { color: '#8e8e93', maxTicksLimit: 10 }, grid: { display: false } }
-                        },
-                        plugins: {
-                            legend: { labels: { color: '#e0e0e0' } }
+            case 'D': {
+                const { card, newDeck } = dealCard(deck);
+                if(card) {
+                    setDeck(newDeck);
+                    setRunningCount(prev => prev + getCardCountValue(card));
+                    handsUpdater(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        const currentHand = newHands[handIndex];
+                        currentHand.cards.push(card);
+                        Object.assign(currentHand, calculateScore(currentHand.cards));
+                        currentHand.isDoubled = true;
+                        if (currentHand.score > 21) {
+                            currentHand.status = 'bust';
+                        } else {
+                            currentHand.status = 'stood';
                         }
+                        return newHands;
+                    });
+                }
+                break;
+            }
+            case 'S': {
+                handsUpdater(prevHands => {
+                    const newHands = JSON.parse(JSON.stringify(prevHands));
+                    const currentHand = newHands[handIndex];
+                    currentHand.status = 'stood';
+                    return newHands;
+                });
+                break;
+            }
+            case 'P': {
+                const { card: card1, newDeck: deck1 } = dealCard(deck);
+                const { card: card2, newDeck: deck2 } = dealCard(deck1);
+                
+                if (card1 && card2) {
+                    setDeck(deck2);
+                    setRunningCount(prev => prev + getCardCountValue(card1) + getCardCountValue(card2));
+                    const handToSplit = hands[handIndex].cards;
+                    const isAces = handToSplit[0].rank === 'A';
+
+                    if (isAces) {
+                        const hand1 = { cards: [handToSplit[0], card1], status: 'stood' };
+                        const hand2 = { cards: [handToSplit[1], card2], status: 'stood' };
+                        Object.assign(hand1, calculateScore(hand1.cards));
+                        Object.assign(hand2, calculateScore(hand2.cards));
+                        setPlayerHands([hand1, hand2]);
+                    } else {
+                        const newHands = JSON.parse(JSON.stringify(playerHands));
+                        newHands.splice(activeHandIndex, 1, 
+                            { cards: [handToSplit[0]], status: 'playing' },
+                            { cards: [handToSplit[1]], status: 'playing' }
+                        );
+                        setPlayerHands(newHands);
+                    }
+                }
+                break;
+            }
+            default: break;
+        }
+    }, [activeHandIndex, calculateScore, dealCard, dealerHand.cards, playerHands, streakCount, deck]);
+
+    const handlePlayerAction = useCallback((actionCode, actionName) => {
+        executePlayerAction(actionCode, actionName);
+    }, [executePlayerAction]);
+
+    const canSplit = useMemo(() => {
+        if (!playerHands[activeHandIndex]) return false;
+        const cards = playerHands[activeHandIndex].cards;
+        return cards.length === 2 && cards[0].rank === cards[1].rank;
+    }, [playerHands, activeHandIndex]);
+
+    const canDouble = useMemo(() => {
+        if (!playerHands[activeHandIndex]) return false;
+        return playerHands[activeHandIndex].cards.length === 2;
+    }, [playerHands, activeHandIndex]);
+    
+    useEffect(() => {
+        if (gameState !== 'player-turn') return;
+        const activeHand = playerHands[activeHandIndex];
+        if (activeHand && activeHand.cards.length === 1) { // After a split
+            setTimeout(() => {
+                const { card, newDeck } = dealCard(deck);
+                if (card) {
+                    setDeck(newDeck);
+                    setRunningCount(prev => prev + getCardCountValue(card));
+                    setPlayerHands(prevHands => {
+                        const newHands = JSON.parse(JSON.stringify(prevHands));
+                        const currentHand = newHands[activeHandIndex];
+                        currentHand.cards.push(card);
+                        Object.assign(currentHand, calculateScore(currentHand.cards));
+                        if (currentHand.score === 21) {
+                            currentHand.status = 'stood';
+                        }
+                        return newHands;
+                    });
+                }
+            }, 500);
+        }
+    }, [playerHands, activeHandIndex, gameState, calculateScore, dealCard, deck]);
+
+    useEffect(() => {
+        if (gameState !== 'player-turn') {
+            setIsActionDisabled(false);
+            return;
+        }
+
+        const hands = playerHands;
+        const handsUpdater = setPlayerHands;
+        const index = activeHandIndex;
+
+        const newHands = JSON.parse(JSON.stringify(hands));
+        const activeHand = newHands[index];
+
+        if (activeHand && activeHand.cards.length >= 2) {
+            if (activeHand.status === 'playing') {
+                if (activeHand.score > 21) activeHand.status = 'bust';
+                else if (activeHand.score === 21) activeHand.status = 'stood';
+            }
+        }
+        
+        if (activeHand && activeHand.status !== 'playing') {
+            const nextHandIndex = newHands.findIndex((hand, i) => i > index && hand.status === 'playing');
+            if (nextHandIndex !== -1) {
+                setActiveHandIndex(nextHandIndex);
+            } else {
+                const allBusted = newHands.every(h => h.status === 'bust');
+                if (allBusted) {
+                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
+                    setTimeout(() => setGameState('end'), 500);
+                } else {
+                    setGameState('dealer-turn');
+                }
+            }
+        }
+        
+        if (JSON.stringify(newHands) !== JSON.stringify(hands)) {
+            handsUpdater(newHands);
+        }
+
+        setTimeout(() => setIsActionDisabled(false), 500);
+
+    }, [playerHands, gameState, activeHandIndex]);
+
+    useEffect(() => {
+        if (gameState !== 'dealer-turn') return;
+
+        let currentDealerHand = JSON.parse(JSON.stringify(dealerHand));
+        currentDealerHand.cards = currentDealerHand.cards.map(c => ({...c, isHidden: false}));
+        
+        let tempDeck = [...deck];
+        let tempRunningCount = runningCount;
+
+        const drawLoop = () => {
+            const scoreInfo = calculateScore(currentDealerHand.cards);
+            if (scoreInfo.score < 17) {
+                const { card, newDeck } = dealCard(tempDeck);
+                if(card) {
+                    currentDealerHand.cards.push(card);
+                    tempDeck = newDeck;
+                    tempRunningCount += getCardCountValue(card);
+                    setTimeout(drawLoop, 300);
+                } else {
+                    finalize();
+                }
+            } else {
+                finalize();
+            }
+        };
+
+        const finalize = () => {
+            setDealerHand(currentDealerHand);
+            setDeck(tempDeck);
+            setRunningCount(tempRunningCount);
+            setGameState('end');
+        };
+
+        drawLoop();
+
+    }, [gameState, calculateScore, dealCard, dealerHand, deck, runningCount]);
+    
+    useEffect(() => {
+        if (gameState === 'end' && !endOfRoundMessageSet.current) {
+            endOfRoundMessageSet.current = true;
+            
+            const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
+            const dealerScoreInfo = calculateScore(revealedDealerHand);
+            
+            const handsToEvaluate = playerHands;
+            
+            const playerHasBj = handsToEvaluate.length === 1 && handsToEvaluate[0]?.cards.length === 2 && handsToEvaluate[0]?.score === 21;
+            const dealerHasBj = dealerScoreInfo.score === 21 && revealedDealerHand.length === 2;
+
+            let resultMessage = '';
+            let handWins = 0;
+            let handLosses = 0;
+            let pushes = 0;
+
+            if (playerHasBj && !dealerHasBj) {
+                resultMessage = 'Blackjack! You win.';
+                setWinCount(prev => prev + 1);
+                setPlayerBjCount(prev => prev + 1);
+            } else if (dealerHasBj && !playerHasBj) {
+                resultMessage = 'Dealer has Blackjack. You lose.';
+                setLossCount(prev => prev + 1);
+                setDealerBjCount(prev => prev + 1);
+            } else if (dealerHasBj && playerHasBj) {
+                resultMessage = 'Push (Both have Blackjack).';
+                pushes++;
+            } else {
+                handsToEvaluate.forEach((hand, index) => {
+                    if (!hand) return;
+                    const outcomeValue = hand.isDoubled ? 2 : 1;
+                    resultMessage += `Hand ${index + 1}: `;
+                    if (hand.status === 'bust') {
+                        resultMessage += 'You lose (Busted). ';
+                        handLosses += outcomeValue;
+                    } else if (dealerScoreInfo.score > 21) {
+                        resultMessage += 'You win (Dealer Busted). ';
+                        handWins += outcomeValue;
+                    } else if (hand.score > dealerScoreInfo.score) {
+                        resultMessage += 'You win (Higher Score). ';
+                        handWins += outcomeValue;
+                    } else if (hand.score < dealerScoreInfo.score) {
+                        resultMessage += 'You lose (Lower Score). ';
+                        handLosses += outcomeValue;
+                    } else {
+                        resultMessage += 'Push. ';
+                        pushes++;
                     }
                 });
-            }
-        };
 
-        document.body.appendChild(script);
-
-        return () => {
-            if (document.body.contains(script)) {
-                document.body.removeChild(script);
+                setWinCount(prev => prev + handWins);
+                setLossCount(prev => prev + handLosses);
+                setPushCount(prev => prev + pushes);
             }
-            if (chartInstanceRef.current) {
-                chartInstanceRef.current.destroy();
-            }
-        };
-    }, []);
+            
+            setDealerHand(prev => ({...prev, cards: revealedDealerHand, ...dealerScoreInfo}));
+            const finalMessage = `${lastActionFeedback.current} ${resultMessage}`;
+            setMessage(finalMessage);
+            setHistory(prev => [{ text: resultMessage, isResult: true }, ...prev]);
+        }
+    }, [gameState, playerHands, dealerHand.cards, calculateScore]);
 
     useEffect(() => {
-        if (chartInstanceRef.current) {
-            chartInstanceRef.current.data.labels = chartData.map((_, index) => index + 1);
-            chartInstanceRef.current.data.datasets[0].data = chartData.map(d => d.rc);
-            chartInstanceRef.current.data.datasets[1].data = chartData.map(d => d.tc);
-            chartInstanceRef.current.update('none');
+        if (feedback) {
+            const timer = setTimeout(() => { setFeedback(''); }, 1500);
+            return () => clearTimeout(timer);
         }
-    }, [chartData]);
+    }, [feedback]);
 
-    const trueCountColor = trueCount >= 2 ? '#34c759' : trueCount <= -1 ? '#ff3b30' : '#e0e0e0';
-    const cardRanks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T'];
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (showCountPrompt) return;
+
+            if (gameState === 'player-turn') {
+                if (event.key.toLowerCase() === 'a') handlePlayerAction('H', 'Hit');
+                if (event.key.toLowerCase() === 's') handlePlayerAction('S', 'Stand');
+                if (event.key.toLowerCase() === 'd' && canDouble) handlePlayerAction('D', 'Double');
+                if (event.key.toLowerCase() === 'f' && canSplit) handlePlayerAction('P', 'Split');
+            }
+
+            if ((gameState === 'pre-deal' || gameState === 'end') && event.key === ' ') {
+                event.preventDefault();
+                dealNewGame();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
+
+    useEffect(() => {
+        if (burstKey > 0) {
+            setBurstAnimClass('animate-long-pulse-burst');
+            const timer = setTimeout(() => setBurstAnimClass(''), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [burstKey]);
+
+    useEffect(() => {
+        if (showWashAway) {
+            const timer = setTimeout(() => setShowWashAway(false), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [washAwayKey]);
+
+    useEffect(() => {
+        if (announcement) {
+            const timer = setTimeout(() => setAnnouncement(null), 3500);
+            return () => clearTimeout(timer);
+        }
+    }, [announcement]);
+
+    useEffect(() => {
+        setTrainerMode('solo');
+        createShoe();
+        setHistory([]);
+        setCorrectCount(0);
+        setIncorrectCount(0);
+        setWinCount(0);
+        setLossCount(0);
+        setPushCount(0);
+        setPlayerBjCount(0);
+        setDealerBjCount(0);
+        setStreakCount(0);
+        setGameState('pre-deal');
+        setMessage('Solo Mode: Press Deal to start.');
+    }, [createShoe]);
+
+
+    const activePlayerHand = useMemo(() => {
+        if (playerHands.length > activeHandIndex) {
+            return playerHands[activeHandIndex].cards;
+        }
+        return [];
+    }, [playerHands, activeHandIndex]);
+
+    const dealerUpCard = useMemo(() => {
+        return dealerHand.cards.find(card => !card.isHidden);
+    }, [dealerHand.cards]);
 
     return (
         <>
-            <style>{`
-                .bjc-app-container {
-                  display: flex;
-                  flex-direction: column;
-                  align-items: center;
-                  min-height: 100vh;
-                  padding: 1rem;
-                  box-sizing: border-box;
-                  background-color: #121212;
-                  color: #e0e0e0;
-                }
-                .bjc-header {
-                    width: 100%;
-                    max-width: 600px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 1rem;
-                    position: relative;
-                }
-                .bjc-header-left, .bjc-header-right { display: flex; gap: 0.5rem; align-items: center; }
-                .bjc-title { font-size: 1.5rem; font-weight: 700; color: #ffffff; }
-                .bjc-header-button {
-                  background-color: #3a3a3c;
-                  color: white;
-                  border: none;
-                  border-radius: 10px;
-                  padding: 0.5rem 1rem;
-                  font-weight: 600;
-                  cursor: pointer;
-                  transition: background-color 0.2s;
-                }
-                .bjc-header-button:hover { background-color: #555; }
-                .bjc-reset-button { background-color: #c53030 !important; }
-                .bjc-reset-button:hover { background-color: #a02828 !important; }
-                
-                .bjc-deck-popout {
-                    position: absolute;
-                    top: calc(100% + 10px);
-                    right: 0;
-                    background-color: #2c2c2e;
-                    border-radius: 12px;
-                    padding: 0.75rem;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-                    z-index: 10;
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 0.5rem;
-                    border: 1px solid #444;
-                }
-                .bjc-deck-popout-button {
-                    width: 45px;
-                    height: 45px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    border: none;
-                    border-radius: 8px;
-                    background-color: #3a3a3c;
-                    color: #e0e0e0;
-                    cursor: pointer;
-                    transition: background-color 0.2s, transform 0.1s;
-                }
-                .bjc-deck-popout-button.active {
-                    background-color: #007aff;
-                    color: white;
-                }
-
-                .bjc-main-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 1rem;
-                    width: 100%;
-                    max-width: 600px;
-                }
-
-                .bjc-panel {
-                    background-color: #1c1c1e;
-                    border-radius: 20px;
-                    padding: 1rem;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                }
-                .bjc-panel-title-container {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: baseline;
-                    margin-bottom: 1rem;
-                }
-                .bjc-panel-title {
-                    font-size: 1rem;
-                    color: #8e8e93;
-                    margin-bottom: 0;
-                    text-align: left;
-                    font-weight: 600;
-                }
-                .bjc-panel-subtitle {
-                    font-size: 0.8rem;
-                    color: #8e8e93;
-                    font-weight: 600;
-                }
-
-                .bjc-counts-display {
-                    grid-column: 1 / -1;
-                    display: flex;
-                    justify-content: space-around;
-                    align-items: center;
-                }
-                .bjc-count-item { text-align: center; }
-                .bjc-count-label { font-size: 1rem; color: #8e8e93; }
-                .bjc-running-count { font-size: 4rem; font-weight: bold; line-height: 1; }
-                .bjc-true-count { font-size: 2rem; font-weight: 600; }
-                
-                .bjc-bet-display {
-                    grid-column: 1 / -1;
-                    text-align: center;
-                }
-                .bjc-bet-value { font-size: 2.5rem; font-weight: bold; color: #34c759; }
-                .bjc-bet-value.no-bet { color: #ff443a; }
-
-                .bjc-card-input { grid-column: 1 / -1; }
-                .bjc-card-keypad {
-                    display: grid;
-                    grid-template-columns: repeat(5, 1fr);
-                    gap: 0.5rem;
-                }
-                .bjc-keypad-button {
-                    padding: 1rem 0.5rem;
-                    font-size: 1.5rem;
-                    font-weight: 700;
-                    border-radius: 10px;
-                    border: none;
-                    background-color: #3a3a3c;
-                    color: white;
-                    cursor: pointer;
-                    transition: background-color 0.2s, transform 0.1s;
-                }
-                .bjc-keypad-button:hover { background-color: #555; }
-                .bjc-keypad-button.active {
-                    transform: scale(0.9);
-                    background-color: #007aff;
-                }
-                 .bjc-simple-buttons {
-                    display: grid;
-                    grid-template-columns: .8fr .6fr 1fr;
-                    gap: 0.75rem;
-                }
-                .bjc-simple-buttons .bjc-keypad-button {
-                    font-size: 1.5rem;
-                    padding: 1.25rem;
-                }
-                .bjc-plus-button {
-                    flex: 0.9;
-                    background-color: #34c759;
-                }
-                .bjc-zero-button {
-                    flex: 0.7;
-                    background-color: #5856d6;
-                }
-                .bjc-minus-group {
-                    display: flex;
-                    gap: 0.75rem;
-                    flex: 1;
-                }
-                .bjc-minus-button {
-                    flex: 3.5;
-                    background-color: #ff3b30;
-                }
-                .bjc-ace-button {
-                    flex: 1;
-                    background-color: #ff9500;
-                }
-
-
-                .bjc-remaining-cards { grid-column: 1 / 2; }
-                .bjc-deviations { grid-column: 2 / 3; }
-                
-                .bjc-rank-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 0.5rem 1.5rem;
-                }
-                .bjc-rank-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    font-size: 0.9rem;
-                    padding: 0.2rem;
-                }
-                .bjc-rank-info {
-                    display: flex;
-                    align-items: baseline;
-                    gap: 0.5rem;
-                }
-                .bjc-rank-percent {
-                    font-size: 0.8rem;
-                    color: #8e8e93;
-                    width: 50px;
-                    text-align: right;
-                }
-                
-                .bjc-deviation-list {
-                    list-style: none;
-                    padding: 0;
-                    margin: 0;
-                    text-align: left;
-                    font-size: 0.9rem;
-                }
-                .bjc-deviation-list li {
-                    padding: 0.3rem 0;
-                    color: #ff9500;
-                    font-weight: 600;
-                }
-                
-                .bjc-header-input-group {
-                  display: flex;
-                  align-items: center;
-                  background-color: #3a3a3c;
-                  border-radius: 10px;
-                  padding: 0 0.25rem;
-                  color: #8e8e93;
-                  overflow: hidden;
-                }
-                .bjc-header-input {
-                  background-color: transparent;
-                  border: none;
-                  color: white;
-                  width: 40px;
-                  text-align: center;
-                  font-weight: 600;
-                  padding: 0.5rem 0.2rem;
-                  font-size: 1rem;
-                }
-                .bjc-header-input::-webkit-outer-spin-button,
-                .bjc-header-input::-webkit-inner-spin-button {
-                  -webkit-appearance: none;
-                  margin: 0;
-                }
-                .bjc-header-input[type=number] {
-                  -moz-appearance: textfield;
-                }
-                .bjc-deck-selector-button {
-                    background-color: transparent;
-                    border-radius: 0;
-                    border-left: 1px solid #555;
-                }
-                
-                .bjc-chart-panel {
-                    grid-column: 1 / -1;
-                }
-                
-                .bjc-input-toggle {
-                    display: flex;
-                    justify-content: flex-end;
-                    align-items: center;
-                    gap: 0.5rem;
-                    margin-bottom: 1rem;
-                }
-                .bjc-toggle-label {
-                    font-size: 0.8rem;
-                    color: #8e8e93;
-                }
-                .bjc-toggle-switch {
-                    position: relative;
-                    display: inline-block;
-                    width: 40px;
-                    height: 22px;
-                }
-                .bjc-toggle-switch input {
-                    opacity: 0;
-                    width: 0;
-                    height: 0;
-                }
-                .bjc-slider {
-                    position: absolute;
-                    cursor: pointer;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: #3a3a3c;
-                    transition: .4s;
-                    border-radius: 22px;
-                }
-                .bjc-slider:before {
-                    position: absolute;
-                    content: "";
-                    height: 18px;
-                    width: 18px;
-                    left: 2px;
-                    bottom: 2px;
-                    background-color: white;
-                    transition: .4s;
-                    border-radius: 50%;
-                }
-                input:checked + .bjc-slider {
-                    background-color: #34c759;
-                }
-                input:checked + .bjc-slider:before {
-                    transform: translateX(18px);
-                }
-
-                @media (max-width: 640px) {
-                    .bjc-main-grid { grid-template-columns: 1fr; }
-                    .bjc-counts-display { flex-direction: column; gap: 1rem; }
-                    .bjc-remaining-cards, .bjc-deviations { grid-column: 1 / -1; }
-                }
-            `}</style>
-            <div className="bjc-app-container">
-                <div className="bjc-header" ref={deckSelectorRef}>
-                    <div className="bjc-header-left">
-                        <h1 className="bjc-title">Pro Counter</h1>
+            <div className={`min-h-screen p-4 flex flex-col items-center transition-colors duration-300 bg-gray-900 text-gray-100`}>
+                {announcement && (
+                    <div id="fullscreen-announcement" className={`is-active announce-${announcement}`}>
+                        <div className="content text-center">
+                            <h2 id="announce-number" className={`text-7xl md:text-9xl font-black number ${announcement === 300 ? 'announce-cosmic-text' : ''}`}>{announcement}</h2>
+                        </div>
+                        <button onClick={() => setAnnouncement(null)} className="absolute top-4 right-4 text-white text-3xl font-bold">&times;</button>
                     </div>
-                    <div className="bjc-header-right">
-                       <button className="bjc-header-button" onClick={onGoBack}>Back</button>
-                       <div className="bjc-header-input-group">
-                           <span>$</span>
-                           <input 
-                               type="text"
-                               pattern="[0-9]*"
-                               inputMode="numeric"
-                               value={tableMinBet} 
-                               onChange={(e) => {
-                                   const value = e.target.value;
-                                   if (/^\d*$/.test(value)) {
-                                       setTableMinBet(value === '' ? 0 : parseInt(value, 10));
-                                   }
-                               }}
-                               className="bjc-header-input"
-                           />
-                           <button className="bjc-header-button bjc-deck-selector-button" onClick={() => setShowDeckSelector(!showDeckSelector)}>
-                               {numDecks}D
-                           </button>
-                       </div>
-                       <button className="bjc-header-button" onClick={undoLastAction}>Undo</button>
-                       <button className="bjc-header-button bjc-reset-button" onClick={resetAll}>Reset</button>
-                    </div>
-                    {showDeckSelector && (
-                        <div className="bjc-deck-popout">
-                            {[1, 2, 3, 4, 5, 6, 7, 8].map(d => (
-                                <button
-                                    key={d}
-                                    className={`bjc-deck-popout-button ${numDecks === d ? 'active' : ''}`}
-                                    onClick={() => handleDeckChange(d)}
-                                >
-                                    {d}
+                )}
+                <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
+                    <div className="flex-grow">
+                        <header className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-6">
+                                <button onClick={onGoBack} className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-600 transition">
+                                    &larr; Back
                                 </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="bjc-main-grid">
-                    <div className="bjc-panel bjc-counts-display">
-                        <div className="bjc-count-item">
-                            <div className="bjc-count-label">Running Count</div>
-                            <div className="bjc-running-count">{runningCount}</div>
-                        </div>
-                        <div className="bjc-count-item">
-                            <div className="bjc-count-label">True Count</div>
-                            <div className="bjc-true-count" style={{ color: trueCountColor }}>{trueCount.toFixed(2)}</div>
-                        </div>
-                    </div>
-
-                    <div className="bjc-panel bjc-bet-display">
-                        <div className="bjc-count-label">Recommended Bet (Advantage: {(advantage * 100).toFixed(2)}%)</div>
-                        {recommendedBet > 0 ? (
-                            <div className="bjc-bet-value">${recommendedBet.toFixed(2)}</div>
-                        ) : (
-                            <div className="bjc-bet-value no-bet">Don't Bet</div>
-                        )}
-                    </div>
-                    
-                    <div className="bjc-panel bjc-card-input">
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                            <div className="bjc-panel-title" style={{marginBottom: 0}}>Card Input</div>
-                            <div className="bjc-input-toggle">
-                                <span className="bjc-toggle-label">Simple</span>
-                                <label className="bjc-toggle-switch">
-                                    <input type="checkbox" checked={inputMode === 'advanced'} onChange={() => setInputMode(prev => prev === 'simple' ? 'advanced' : 'simple')} />
-                                    <span className="bjc-slider"></span>
-                                </label>
-                                <span className="bjc-toggle-label">Advanced</span>
+                                <h1 className="text-3xl font-bold transition-colors duration-300">Strategy Trainer</h1>
                             </div>
-                        </div>
-                        <hr style={{borderColor: '#3a3a3c', margin: '0.75rem 0'}} />
+                            <button
+                                onClick={() => setShowChartModal(true)}
+                                className="bg-gray-700 text-white rounded-lg p-2 shadow-md hover:bg-gray-600 transition-colors flex items-center justify-center"
+                                title="View Basic Strategy Chart"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </button>
+                        </header>
 
-                        {inputMode === 'advanced' ? (
-                            <div className="bjc-card-keypad">
-                                {cardRanks.map(rank => (
-                                    <button 
-                                        key={rank} 
-                                        className={`bjc-keypad-button ${activeKey === rank ? 'active' : ''}`} 
-                                        onClick={() => handleCard(rank)}
-                                    >
-                                        {rank}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="bjc-simple-buttons">
-                                <button className="bjc-keypad-button bjc-plus-button" onClick={() => handleCard(1)}>+1</button>
-                                <button className="bjc-keypad-button bjc-zero-button" onClick={() => handleCard(0)}>0</button>
-                                <div className="bjc-minus-group">
-                                    <button className="bjc-keypad-button bjc-minus-button" onClick={() => handleCard(-1)}>-1</button>
-                                    <button className="bjc-keypad-button bjc-ace-button" onClick={() => handleCard(-1, true)}>A</button>
+                        <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
+                            <div className="text-center mb-2">
+                                <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
+                                <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
+                                    {dealerHand.cards.map((card, i) => <Card key={i} {...card} />)}
                                 </div>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="bjc-panel bjc-remaining-cards">
-                        <div className="bjc-panel-title-container">
-                            <div className="bjc-panel-title">Remaining Cards</div>
-                            <div className="bjc-panel-subtitle">{cardsPlayed} / {TOTAL_CARDS} Played</div>
-                        </div>
-                        {inputMode === 'advanced' ? (
-                            <div className="bjc-rank-grid">
-                                {cardRanks.map(rank => {
-                                    const remaining = CARDS_PER_RANK[rank] - cardsPlayedByRank[rank];
-                                    const totalRemaining = TOTAL_CARDS - cardsPlayed;
-                                    const percentage = totalRemaining > 0 ? (remaining / totalRemaining) * 100 : 0;
-                                    return (
-                                        <div key={rank} className="bjc-rank-item">
-                                            <div className="bjc-rank-info">
-                                                <span>{rank}:</span>
-                                                <span>{remaining}/{CARDS_PER_RANK[rank]}</span>
+                            <div className="text-center my-0 h-10 flex items-center justify-center">
+                                {feedback && gameState !== 'pre-deal' && gameState !== 'pre-game' && (
+                                    <p className={`text-2xl font-bold animate-fade-in ${isFeedbackCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                                        {feedback}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="text-center">
+                                {(playerHands.length === 0 && (gameState === 'pre-deal' || gameState === 'pre-game')) ? (
+                                    <div
+                                        onClick={dealNewGame}
+                                        className="min-h-[250px] flex items-center justify-center bg-gray-800/50 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        <p className="text-2xl font-bold text-gray-400">Tap to Deal</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap justify-center items-start gap-1 sm:gap-2">
+                                        {playerHands.map((hand, i) => (
+                                            <div key={i} className={`relative p-2 rounded-lg ${i === activeHandIndex && gameState === 'player-turn' ? 'bg-yellow-400 bg-opacity-30' : ''}`}>
+                                                <div className="font-bold text-xl text-center h-8 flex flex-col justify-center">
+                                                    <div className="flex justify-center items-center gap-2">
+                                                        <span>
+                                                            {playerHands.length > 1 ? `Hand ${i + 1}: ` : ''}
+                                                            {hand.status === 'bust' ? 'Bust' : hand.display}
+                                                        </span>
+                                                        {hand.cards.length === 2 && hand.cards[0].rank === hand.cards[1].rank && (
+                                                            <span className="text-xs font-bold bg-blue-500 text-white px-2 py-1 rounded-full">
+                                                                SPLIT
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-center items-center flex-wrap gap-x-1 gap-y-2 mt-2">
+                                                    {hand.cards.map((card, j) => <Card key={j} {...card} />)}
+                                                </div>
+                                                {(gameState !== 'pre-deal' && gameState !== 'pre-game') && (
+                                                    <button
+                                                        onClick={dealNewGame}
+                                                        disabled={gameState !== 'end'}
+                                                        className={`absolute inset-0 w-full h-full bg-transparent text-transparent border-none shadow-none text-xl font-bold flex items-center justify-center
+                                                            ${gameState === 'end' ? 'cursor-pointer' : ''}
+                                                            transition-all duration-300`}
+                                                    >
+                                                    </button>
+                                                )}
                                             </div>
-                                            <span className="bjc-rank-percent">{percentage.toFixed(1)}%</span>
-                                        </div>
-                                    )
-                                })}
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-4 flex justify-center space-x-2 md:space-x-4">
+                                    {[
+                                        ['Hit', 'H'], 
+                                        ['Stand', 'S'], 
+                                        ['Double', 'D'], 
+                                        ['Split', 'P']
+                                    ].map(([actionName, actionCode]) => (
+                                        <button
+                                            key={actionName}
+                                            onClick={() => handlePlayerAction(actionCode, actionName)}
+                                            disabled={isActionDisabled || gameState !== 'player-turn' || (actionCode === 'P' && !canSplit) || (actionCode === 'D' && !canDouble)}
+                                            className={`w-28 md:w-32 text-center py-3 md:py-4 font-bold text-lg rounded-xl shadow-lg transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed
+                                                ${actionCode === 'H' && 'bg-green-500 text-white'}
+                                                ${actionCode === 'S' && 'bg-red-500 text-white'}
+                                                ${actionCode === 'D' && 'bg-orange-400 text-white'}
+                                                ${actionCode === 'P' && 'bg-blue-500 text-white'}`}
+                                        >
+                                            {actionName}
+                                        </button>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="w-full md:w-72 mt-4 md:mt-0 flex flex-col-reverse md:flex-col flex-shrink-0">
+                        <HistoryTracker history={history} correctCount={correctCount} incorrectCount={incorrectCount} winCount={winCount} lossCount={lossCount} playerBjCount={playerBjCount} dealerBjCount={dealerBjCount} pushCount={pushCount} />
+                        <div className="md:hidden h-4"></div>
+                        {showWashAway ? (
+                            <div key={washAwayKey} className="mt-4 bg-gray-800 bg-opacity-80 backdrop-blur-sm p-4 rounded-xl shadow-2xl flex items-center justify-center gap-2 animate-wash-away">
+                                <span className="text-2xl">💔🥀</span><span className="text-xl font-bold text-gray-400">Streak Lost</span>
                             </div>
                         ) : (
-                           <div className="bjc-rank-grid" style={{gridTemplateColumns: '1fr'}}>
-                               <div className="bjc-rank-item"><span>Low (2-6):</span> <span>{INITIAL_LOW_CARDS - lowCardsPlayed}/{INITIAL_LOW_CARDS}</span></div>
-                               <div className="bjc-rank-item"><span>Neutral (7-9):</span> <span>{INITIAL_NEUTRAL_CARDS - neutralCardsPlayed}/{INITIAL_NEUTRAL_CARDS}</span></div>
-                               <div className="bjc-rank-item"><span>High (10-A):</span> <span>{INITIAL_HIGH_CARDS - highCardsPlayed}/{INITIAL_HIGH_CARDS}</span></div>
-                               <div className="bjc-rank-item" style={{marginTop: '0.5rem'}}><span>Aces Left:</span> <span>{TOTAL_ACES - acesPlayed}</span></div>
-                           </div>
+                           <StreakCounter streak={streakCount} burstAnimClass={burstAnimClass} />
                         )}
-                    </div>
-
-                    <div className="bjc-panel bjc-deviations">
-                        <div className="bjc-panel-title">Active Deviations</div>
-                        {playingDeviations.length > 0 ? (
-                            <ul className="bjc-deviation-list">
-                                {playingDeviations.map(dev => <li key={dev}>{dev}</li>)}
-                            </ul>
-                        ) : (
-                            <p style={{fontSize: '0.9rem', color: '#8e8e93'}}>None</p>
-                        )}
-                    </div>
-
-                    <div className="bjc-panel bjc-chart-panel">
-                        <div className="bjc-panel-title">Count Trends</div>
-                        <canvas ref={chartCanvasRef}></canvas>
                     </div>
                 </div>
+                {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
+                {showChartModal && (
+                    <BasicStrategyModal 
+                        playerHand={activePlayerHand} 
+                        dealerUpCard={dealerUpCard} 
+                        onClose={() => setShowChartModal(false)}
+                        calculateScore={calculateScore}
+                    />
+                )}
             </div>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Roboto+Mono&display=swap');
+                
+                body {
+                    font-family: 'Nunito', sans-serif;
+                    overflow-x: hidden;
+                }
+                .font-mono {
+                    font-family: 'Roboto Mono', monospace;
+                }
+                .streak-box {
+                    position: relative;
+                    z-index: 1;
+                }
+                @keyframes deal {
+                    from { opacity: 0; transform: translateY(-20px) scale(0.8); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                .animate-deal { animation: deal 0.4s ease-out forwards; }
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+                
+                @keyframes long-pulse-burst {
+                    0% {
+                      transform: scale(1);
+                      box-shadow: 0 0 0px 0px rgba(147, 197, 253, 0);
+                    }
+                    50% {
+                      transform: scale(1.15);
+                      box-shadow: 0 0 30px 10px rgba(147, 197, 253, 0.7);
+                    }
+                    100% {
+                      transform: scale(1);
+                      box-shadow: 0 0 0px 0px rgba(147, 197, 253, 0);
+                    }
+                }
+                .animate-long-pulse-burst {
+                    animation: long-pulse-burst 1.5s ease-in-out forwards;
+                }
+
+                @keyframes wash-away {
+                    from { opacity: 1; transform: translateY(0); filter: blur(0); }
+                    to { opacity: 0; transform: translateY(40px); filter: blur(4px); }
+                }
+                .animate-wash-away {
+                    animation: wash-away 1.5s ease-in forwards;
+                }
+
+                @keyframes subtle-glow {
+                    0%, 100% { text-shadow: 0 0 6px #ffffff55; }
+                    50% { text-shadow: 0 0 10px #ffffff88; }
+                }
+                .animate-subtle-glow {
+                    animation: subtle-glow 2.5s ease-in-out infinite;
+                }
+
+                @keyframes bright-glow {
+                    0%, 100% { text-shadow: 0 0 8px #ffffffaa, 0 0 12px #ffffff88; }
+                    50% { text-shadow: 0 0 16px #ffffff, 0 0 24px #ffffffaa; }
+                }
+                .animate-bright-glow {
+                    animation: bright-glow 2s ease-in-out infinite;
+                }
+
+                @keyframes blue-aura {
+                    0%, 100% { text-shadow: 0 0 10px #60a5fa, 0 0 20px #3b82f6; }
+                    50% { text-shadow: 0 0 15px #93c5fd, 0 0 30px #60a5fa; }
+                }
+                .animate-blue-aura {
+                    animation: blue-aura 2s ease-in-out infinite;
+                    color: #dbeafe;
+                }
+
+                @keyframes energy-flicker {
+                    0%   { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
+                    25%  { text-shadow: 0 0 12px #fde047, 0 0 25px #facc15; }
+                    50%  { text-shadow: 0 0 10px #fde047, 0 0 22px #facc15; }
+                    75%  { text-shadow: 0 0 14px #fde047, 0 0 28px #facc15; }
+                    100% { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
+                }
+                .animate-energy-flicker {
+                    animation: energy-flicker 1.5s linear infinite;
+                    color: #fef9c3;
+                }
+
+                @keyframes slow-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                .animate-slow-pulse {
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                    color: #ede9fe;
+                }
+
+                .animate-pulse-flicker {
+                    animation: slow-pulse 2.5s ease-in-out infinite, energy-flicker 1.5s linear infinite;
+                    color: #fef9c3;
+                }
+
+                @keyframes ring-glow-rose {
+                    from { box-shadow: 0 0 10px 0px #fecdd3, inset 0 0 10px 0px #fecdd3; }
+                    to { box-shadow: 0 0 20px 5px #fecdd3, inset 0 0 20px 2px #fecdd3; }
+                }
+                .animate-slow-pulse-ring {
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                    color: #fecdd3;
+                    text-shadow: 0 0 12px #fecdd3;
+                }
+                .animate-slow-pulse-ring::before {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 1rem;
+                    z-index: -1;
+                    animation: ring-glow-rose 2.5s ease-in-out infinite alternate;
+                }
+
+                @keyframes fast-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.08); }
+                }
+                @keyframes text-glow-red {
+                    from { text-shadow: 0 0 10px #fca5a5, 0 0 20px #ef4444; }
+                    to { text-shadow: 0 0 20px #fca5a5, 0 0 30px #ef4444, 0 0 40px #ef4444; }
+                }
+                .animate-fast-pulse-ring {
+                    animation: fast-pulse 1s ease-in-out infinite, text-glow-red 1.5s ease-in-out infinite alternate;
+                    color: #fca5a5;
+                }
+                .animate-fast-pulse-ring::before {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 1rem;
+                    z-index: -1;
+                    animation: ring-glow-rose 1s ease-in-out infinite alternate;
+                }
+
+                @keyframes cosmic-border-shift {
+                    to { background-position: 200% center; }
+                }
+                @keyframes cosmic-text-glow {
+                    from { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff; }
+                    to { text-shadow: 0 0 20px #fff, 0 0 30px #60a5fa, 0 0 40px #60a5fa; }
+                }
+                @keyframes aura-ring-pulse {
+                    from { box-shadow: 0 0 20px 5px #ffffff88; opacity: 0.7; }
+                    to { box-shadow: 0 0 35px 15px #ffffff00; opacity: 1; }
+                }
+                .tier-8-box {
+                    background-color: #1e1b4b;
+                    border: 4px solid transparent;
+                    background-clip: padding-box;
+                    position: relative;
+                }
+                .tier-8-box::before {
+                    content: '';
+                    position: absolute;
+                    top: -4px; bottom: -4px; left: -4px; right: -4px;
+                    background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
+                    background-size: 200% 100%;
+                    border-radius: 1rem;
+                    animation: cosmic-border-shift 4s linear infinite;
+                    z-index: -1;
+                }
+                .tier-8-box::after {
+                    content: '';
+                    position: absolute;
+                    inset: -10px;
+                    border-radius: 1.25rem;
+                    z-index: -2;
+                    animation: aura-ring-pulse 2s ease-in-out infinite alternate;
+                }
+                .tier-8-box .cosmic-text {
+                    color: #fff;
+                    animation: cosmic-text-glow 2s ease-in-out infinite alternate;
+                }
+                
+                #fullscreen-announcement {
+                    display: none;
+                    position: fixed;
+                    inset: 0;
+                    background-color: rgba(0, 0, 0, 0.8);
+                    z-index: 100;
+                    align-items: center;
+                    justify-content: center;
+                    backdrop-filter: blur(5px);
+                }
+                @keyframes announce-fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes announce-text-zoom {
+                    from { transform: scale(0.5); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                #fullscreen-announcement.is-active {
+                    display: flex;
+                    animation: announce-fade-in 0.3s ease-out;
+                }
+                #fullscreen-announcement .content {
+                    animation: announce-text-zoom 0.7s 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+                }
+                .announce-100 .number {
+                    color: #93c5fd;
+                    text-shadow: 0 0 15px #60a5fa, 0 0 25px #3b82f6;
+                }
+                
+                @keyframes starfield {
+                    from { background-position: 0 0; }
+                    to { background-position: -10000px 5000px; }
+                }
+                .announce-200 {
+                    background-image: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png);
+                    animation: starfield 200s linear infinite;
+                }
+                .announce-200 .number {
+                    color: #d8b4fe;
+                    text-shadow: 0 0 15px #a855f7, 0 0 30px #a855f7;
+                    animation: slow-pulse 2.5s ease-in-out infinite;
+                }
+                
+                @keyframes screen-shake {
+                    0%, 100% { transform: translate(0, 0); }
+                    10%, 30%, 50%, 70%, 90% { transform: translate(-2px, 2px); }
+                    20%, 40%, 60%, 80% { transform: translate(2px, -2px); }
+                }
+                @keyframes rainbow-shift {
+                    to { background-position: 200% center; }
+                }
+                .announce-300 {
+                    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 60%), url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png), url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/twinkling.png);
+                    animation: starfield 100s linear infinite, screen-shake 0.5s linear;
+                }
+                .announce-300 .number {
+                    background-image: linear-gradient(to right, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    color: transparent;
+                    animation: rainbow-shift 3s linear infinite;
+                }
+            `}</style>
         </>
     );
-};
+}
 
-export default BlackjackCounter;
+export default BlackjackTrainer;
+
