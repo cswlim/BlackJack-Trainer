@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import Card from '../../components/Card';
-import HistoryTracker from '../../components/HistoryTracker';
-import StreakCounter from '../../components/StreakCounter';
-import BasicStrategyModal from '../../components/BasicStrategyModal';
-import CountPromptModal from '../../components/CountPromptModal';
-import { getBasicStrategy, getCardCountValue } from '../../utils/blackjackLogic';
+import Card from '../../components/Card.js';
+import HistoryTracker from '../../components/HistoryTracker.js';
+import StreakCounter from '../../components/StreakCounter.js';
+import BasicStrategyChartModal from '../../components/BasicStrategyModal.js';
+import CountPromptModal from '../../components/CountPromptModal.js';
+import { getBasicStrategy, getCardCountValue } from '../../utils/blackjackLogic.js';
 
 const BlackjackTrainer = ({ onGoBack }) => {
     const [trainerMode, setTrainerMode] = useState(null);
@@ -563,8 +563,8 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     <div className="flex-grow">
                         <header className="flex justify-between items-center mb-4">
                             <div className="flex items-center gap-6">
-                                <button onClick={onGoBack} className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-600 transition">
-                                    &larr; Back
+                                <button onClick={onGoBack} className="px-3 py-1.5 text-sm bg-blue-500 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-600 transition">
+                                    Back
                                 </button>
                                 <h1 className="text-3xl font-bold transition-colors duration-300">Strategy Trainer</h1>
                             </div>
@@ -579,7 +579,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                             </button>
                         </header>
 
-                        <div className="bg-slate-800 border-4 border-slate-900 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
+                        <div className="bg-gray-900 border-4 border-gray-800 rounded-3xl shadow-xl p-2 md:p-6 text-white flex flex-col justify-between flex-grow min-h-[60vh]">
                             <div className="text-center mb-2">
                                 <h2 className="text-xl font-semibold mb-2">Dealer {gameState !== 'player-turn' && dealerHand.display ? `: ${dealerHand.display}` : ''}</h2>
                                 <div className="flex justify-center items-center gap-x-1 gap-y-2 flex-wrap">
@@ -676,7 +676,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 </div>
                 {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
                 {showChartModal && (
-                    <BasicStrategyModal 
+                    <BasicStrategyChartModal 
                         playerHand={activePlayerHand} 
                         dealerUpCard={dealerUpCard} 
                         onClose={() => setShowChartModal(false)}
@@ -935,4 +935,3 @@ const BlackjackTrainer = ({ onGoBack }) => {
 }
 
 export default BlackjackTrainer;
-
