@@ -370,9 +370,11 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
     }, [playerHands, gameState, activeHandIndex]);
 
-    useEffect(() => {
-        if (gameState !== 'dealer-turn') return;
+   useEffect(() => {
+    if (gameState !== 'dealer-turn') return;
 
+    // Use a timeout to give a moment for the player's last action to register visually
+    const turnDelay = setTimeout(() => {
         let currentDealerHand = JSON.parse(JSON.stringify(dealerHand));
         currentDealerHand.cards = currentDealerHand.cards.map(c => ({...c, isHidden: false}));
         
@@ -381,31 +383,41 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
         const drawLoop = () => {
             const scoreInfo = calculateScore(currentDealerHand.cards);
-            if (scoreInfo.score < 17) {
+            
+            // --- MODIFIED LOGIC ---
+            // Dealer hits if score is less than 17, OR if it's a soft 17.
+            if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
                 const { card, newDeck } = dealCard(tempDeck);
                 if(card) {
                     currentDealerHand.cards.push(card);
                     tempDeck = newDeck;
                     tempRunningCount += getCardCountValue(card);
-                    setTimeout(drawLoop, 300);
+                    // Update the hand in real-time for the UI
+                    setDealerHand(JSON.parse(JSON.stringify(currentDealerHand))); 
+                    setTimeout(drawLoop, 500); // Slower timeout to see the hits
                 } else {
-                    finalize();
+                    finalize(); // Out of cards
                 }
             } else {
-                finalize();
+                finalize(); // Stand
             }
         };
 
         const finalize = () => {
-            setDealerHand(currentDealerHand);
+            const finalScoreInfo = calculateScore(currentDealerHand.cards);
+            // --- IMPROVED FINALIZE ---
+            setDealerHand({ ...currentDealerHand, ...finalScoreInfo });
             setDeck(tempDeck);
             setRunningCount(tempRunningCount);
             setGameState('end');
         };
 
         drawLoop();
+    }, 500); // Initial delay before dealer acts
 
-    }, [gameState, calculateScore, dealCard, dealerHand, deck, runningCount]);
+    return () => clearTimeout(turnDelay); // Cleanup timeout
+
+}, [gameState]); // Simplified dependencies for this effect
     
     useEffect(() => {
         if (gameState === 'end' && !endOfRoundMessageSet.current) {
@@ -935,3 +947,4 @@ const BlackjackTrainer = ({ onGoBack }) => {
 }
 
 export default BlackjackTrainer;
+
