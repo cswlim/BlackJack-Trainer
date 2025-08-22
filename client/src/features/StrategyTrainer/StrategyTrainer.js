@@ -8,11 +8,9 @@ import { getBasicStrategy, getCardCountValue } from '../../utils/blackjackLogic.
 
 const BlackjackTrainer = ({ onGoBack }) => {
     const [trainerMode, setTrainerMode] = useState(null);
-    const NUM_DECKS = 6;
+    const NUM_DECKS = 8; // Set to 8 for an 8-deck shoe
 
     const [deck, setDeck] = useState([]);
-    const [cutCardPosition, setCutCardPosition] = useState(0);
-    const [isCutCardRevealed, setIsCutCardRevealed] = useState(false);
     const [gameState, setGameState] = useState('pre-game');
     
     const [playerHands, setPlayerHands] = useState([]);
@@ -21,7 +19,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
     
     const [runningCount, setRunningCount] = useState(0);
     const [showCountPrompt, setShowCountPrompt] = useState(false);
-    const [pendingPlayerAction, setPendingPlayerAction] = useState(null);
 
     const [message, setMessage] = useState('Select a game mode to start.');
     const [feedback, setFeedback] = useState('');
@@ -47,7 +44,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
     const [washAwayKey, setWashAwayKey] = useState(0);
     const [showWashAway, setShowWashAway] = useState(false);
 
-
+    // Creates and returns a fresh, shuffled shoe. No longer sets state.
     const createShoe = useCallback(() => {
         const suits = ['♠', '♣', '♥', '♦'];
         const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -59,18 +56,12 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 }
             }
         }
+        // Shuffle the deck
         for (let i = newDeck.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
         }
-        
-        const min = Math.floor(newDeck.length * 0.72);
-        const max = Math.floor(newDeck.length * 0.78);
-        setCutCardPosition(Math.floor(Math.random() * (max - min + 1)) + min);
-
-        setDeck(newDeck);
-        setRunningCount(0);
-        setIsCutCardRevealed(false);
+        return newDeck;
     }, []);
 
     const calculateScore = useCallback((hand) => {
@@ -105,77 +96,61 @@ const BlackjackTrainer = ({ onGoBack }) => {
         }
     }, []);
 
+    // Simplified dealCard without cut card logic
     const dealCard = useCallback((currentDeck) => {
         if (currentDeck.length === 0) {
+            console.error("Deck ran out of cards unexpectedly.");
             return { card: null, newDeck: [] };
         }
         const newDeck = [...currentDeck];
-        if (newDeck.length === cutCardPosition) {
-            setIsCutCardRevealed(true);
-        }
         const card = newDeck.pop();
         return { card, newDeck };
-    }, [cutCardPosition]);
+    }, []);
 
+    // Overhauled to create a fresh shoe every hand
     const dealNewGame = useCallback(() => {
-        if (isCutCardRevealed) {
-            createShoe();
-            setTimeout(() => setGameState('pre-deal'), 100);
-            return;
-        }
-
+        const newShoe = createShoe(); 
+        
         endOfRoundMessageSet.current = false;
-        lastActionFeedback.current = '';
         setMessage('');
         setFeedback('');
         setIsFeedbackCorrect(false);
         setActiveHandIndex(0);
+        setRunningCount(0);
 
-        setDeck(prevDeck => {
-            let tempDeck = [...prevDeck];
-            if (tempDeck.length < 4) {
-                console.error("Not enough cards to deal a new game.");
-                return tempDeck;
-            }
+        const { card: playerCard1, newDeck: deck1 } = dealCard(newShoe);
+        const { card: dealerCard1, newDeck: deck2 } = dealCard(deck1);
+        const { card: playerCard2, newDeck: deck3 } = dealCard(deck2);
+        const { card: dealerCard2, newDeck: deck4 } = dealCard(deck3);
 
-            const { card: playerCard1, newDeck: deck1 } = dealCard(tempDeck);
-            const { card: dealerCard1, newDeck: deck2 } = dealCard(deck1);
-            const { card: playerCard2, newDeck: deck3 } = dealCard(deck2);
-            const { card: dealerCard2, newDeck: deck4 } = dealCard(deck3);
+        const tempPlayerHand = [playerCard1, playerCard2];
+        const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
+        const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
 
-            const tempPlayerHand = [playerCard1, playerCard2];
-            const tempDealerHand = [dealerCard1, { ...dealerCard2, isHidden: true }];
-            const playerInitialState = { cards: tempPlayerHand, ...calculateScore(tempPlayerHand), status: 'playing' };
-
-            setPlayerHands([playerInitialState]);
-            setDealerHand({ cards: tempDealerHand });
-            
-            let newRunningCount = runningCount;
-            [playerCard1, dealerCard1, playerCard2, dealerCard2].forEach(c => {
-                newRunningCount += getCardCountValue(c);
-            });
-            setRunningCount(newRunningCount);
-
-            const playerHasBj = playerInitialState.score === 21;
-            const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
-            
-            if (playerHasBj || dealerHasBj) {
-                setGameState('end');
-            } else {
-                setGameState('player-turn');
-            }
-            
-            return deck4;
+        setPlayerHands([playerInitialState]);
+        setDealerHand({ cards: tempDealerHand });
+        
+        let newRunningCount = 0;
+        [playerCard1, dealerCard1, playerCard2, dealerCard2].forEach(c => {
+            if(c) newRunningCount += getCardCountValue(c);
         });
-    }, [isCutCardRevealed, createShoe, dealCard, calculateScore, runningCount]);
+        setRunningCount(newRunningCount);
+
+        setDeck(deck4); 
+
+        const playerHasBj = playerInitialState.score === 21;
+        const dealerHasBj = calculateScore([dealerCard1, dealerCard2]).score === 21;
+        
+        if (playerHasBj || dealerHasBj) {
+            setGameState('end');
+        } else {
+            setGameState('player-turn');
+        }
+    }, [createShoe, dealCard, calculateScore]);
 
     const executePlayerAction = useCallback((actionCode, actionName) => {
         setIsActionDisabled(true);
-        const hands = playerHands;
-        const handIndex = activeHandIndex;
-        const handsUpdater = setPlayerHands;
-
-        const currentHandRef = hands[handIndex];
+        const currentHandRef = playerHands[activeHandIndex];
         const dealerUpCard = dealerHand.cards.find(c => !c.isHidden);
         
         const correctMove = getBasicStrategy(currentHandRef.cards, dealerUpCard);
@@ -218,10 +193,10 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 if(card) {
                     setDeck(newDeck);
                     setRunningCount(prev => prev + getCardCountValue(card));
-                    handsUpdater(prevHands => {
+                    setPlayerHands(prevHands => {
                         const newHands = JSON.parse(JSON.stringify(prevHands));
-                        newHands[handIndex].cards.push(card);
-                        Object.assign(newHands[handIndex], calculateScore(newHands[handIndex].cards));
+                        newHands[activeHandIndex].cards.push(card);
+                        Object.assign(newHands[activeHandIndex], calculateScore(newHands[activeHandIndex].cards));
                         return newHands;
                     });
                 }
@@ -232,9 +207,9 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 if(card) {
                     setDeck(newDeck);
                     setRunningCount(prev => prev + getCardCountValue(card));
-                    handsUpdater(prevHands => {
+                    setPlayerHands(prevHands => {
                         const newHands = JSON.parse(JSON.stringify(prevHands));
-                        const currentHand = newHands[handIndex];
+                        const currentHand = newHands[activeHandIndex];
                         currentHand.cards.push(card);
                         Object.assign(currentHand, calculateScore(currentHand.cards));
                         currentHand.isDoubled = true;
@@ -249,10 +224,9 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 break;
             }
             case 'S': {
-                handsUpdater(prevHands => {
+                setPlayerHands(prevHands => {
                     const newHands = JSON.parse(JSON.stringify(prevHands));
-                    const currentHand = newHands[handIndex];
-                    currentHand.status = 'stood';
+                    newHands[activeHandIndex].status = 'stood';
                     return newHands;
                 });
                 break;
@@ -264,7 +238,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 if (card1 && card2) {
                     setDeck(deck2);
                     setRunningCount(prev => prev + getCardCountValue(card1) + getCardCountValue(card2));
-                    const handToSplit = hands[handIndex].cards;
+                    const handToSplit = playerHands[activeHandIndex].cards;
                     const isAces = handToSplit[0].rank === 'A';
 
                     if (isAces) {
@@ -334,90 +308,86 @@ const BlackjackTrainer = ({ onGoBack }) => {
         }
 
         const hands = playerHands;
-        const handsUpdater = setPlayerHands;
         const index = activeHandIndex;
+        const activeHand = hands[index];
 
-        const newHands = JSON.parse(JSON.stringify(hands));
-        const activeHand = newHands[index];
+        if (activeHand && activeHand.cards.length >= 2 && activeHand.status === 'playing') {
+            let newStatus = activeHand.status;
+            if (activeHand.score > 21) newStatus = 'bust';
+            else if (activeHand.score === 21) newStatus = 'stood';
 
-        if (activeHand && activeHand.cards.length >= 2) {
-            if (activeHand.status === 'playing') {
-                if (activeHand.score > 21) activeHand.status = 'bust';
-                else if (activeHand.score === 21) activeHand.status = 'stood';
+            if (newStatus !== activeHand.status) {
+                const newHands = JSON.parse(JSON.stringify(hands));
+                newHands[index].status = newStatus;
+                setPlayerHands(newHands);
+                return; // Let the next render handle the game state change
             }
         }
         
         if (activeHand && activeHand.status !== 'playing') {
-            const nextHandIndex = newHands.findIndex((hand, i) => i > index && hand.status === 'playing');
+            const nextHandIndex = hands.findIndex((hand, i) => i > index && hand.status === 'playing');
             if (nextHandIndex !== -1) {
                 setActiveHandIndex(nextHandIndex);
             } else {
-                const allBusted = newHands.every(h => h.status === 'bust');
-                if (allBusted) {
-                    setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
-                    setTimeout(() => setGameState('end'), 500);
-                } else {
-                    setGameState('dealer-turn');
+                const allPlayerHandsDone = hands.every(h => h.status !== 'playing');
+                if (allPlayerHandsDone) {
+                    const allBusted = hands.every(h => h.status === 'bust');
+                    if (allBusted) {
+                        setDealerHand(prev => ({...prev, cards: prev.cards.map(c => ({...c, isHidden: false}))}));
+                        setTimeout(() => setGameState('end'), 500);
+                    } else {
+                        setGameState('dealer-turn');
+                    }
                 }
             }
         }
-        
-        if (JSON.stringify(newHands) !== JSON.stringify(hands)) {
-            handsUpdater(newHands);
-        }
-
         setTimeout(() => setIsActionDisabled(false), 500);
 
     }, [playerHands, gameState, activeHandIndex]);
 
-   useEffect(() => {
-    if (gameState !== 'dealer-turn') return;
+    useEffect(() => {
+        if (gameState !== 'dealer-turn') return;
 
-    // Use a timeout to give a moment for the player's last action to register visually
-    const turnDelay = setTimeout(() => {
-        let currentDealerHand = JSON.parse(JSON.stringify(dealerHand));
-        currentDealerHand.cards = currentDealerHand.cards.map(c => ({...c, isHidden: false}));
-        
-        let tempDeck = [...deck];
-        let tempRunningCount = runningCount;
-
-        const drawLoop = () => {
-            const scoreInfo = calculateScore(currentDealerHand.cards);
+        const turnDelay = setTimeout(() => {
+            let currentDealerHand = JSON.parse(JSON.stringify(dealerHand));
+            currentDealerHand.cards = currentDealerHand.cards.map(c => ({...c, isHidden: false}));
             
-            // --- MODIFIED LOGIC ---
-            // Dealer hits if score is less than 17, OR if it's a soft 17.
-            if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
-                const { card, newDeck } = dealCard(tempDeck);
-                if(card) {
-                    currentDealerHand.cards.push(card);
-                    tempDeck = newDeck;
-                    tempRunningCount += getCardCountValue(card);
-                    // Update the hand in real-time for the UI
-                    setDealerHand(JSON.parse(JSON.stringify(currentDealerHand))); 
-                    setTimeout(drawLoop, 500); // Slower timeout to see the hits
+            let tempDeck = [...deck];
+            let tempRunningCount = runningCount;
+
+            const drawLoop = () => {
+                const scoreInfo = calculateScore(currentDealerHand.cards);
+                
+                if (scoreInfo.score < 17 || (scoreInfo.score === 17 && scoreInfo.isSoft)) {
+                    const { card, newDeck } = dealCard(tempDeck);
+                    if(card) {
+                        currentDealerHand.cards.push(card);
+                        tempDeck = newDeck;
+                        tempRunningCount += getCardCountValue(card);
+                        setDealerHand(JSON.parse(JSON.stringify(currentDealerHand))); 
+                        setTimeout(drawLoop, 500);
+                    } else {
+                        finalize();
+                    }
                 } else {
-                    finalize(); // Out of cards
+                    finalize();
                 }
-            } else {
-                finalize(); // Stand
-            }
-        };
+            };
 
-        const finalize = () => {
-            const finalScoreInfo = calculateScore(currentDealerHand.cards);
-            // --- IMPROVED FINALIZE ---
-            setDealerHand({ ...currentDealerHand, ...finalScoreInfo });
-            setDeck(tempDeck);
-            setRunningCount(tempRunningCount);
-            setGameState('end');
-        };
+            const finalize = () => {
+                const finalScoreInfo = calculateScore(currentDealerHand.cards);
+                setDealerHand({ ...currentDealerHand, ...finalScoreInfo });
+                setDeck(tempDeck);
+                setRunningCount(tempRunningCount);
+                setGameState('end');
+            };
 
-        drawLoop();
-    }, 500); // Initial delay before dealer acts
+            drawLoop();
+        }, 500);
 
-    return () => clearTimeout(turnDelay); // Cleanup timeout
+        return () => clearTimeout(turnDelay);
 
-}, [gameState]); // Simplified dependencies for this effect
+    }, [gameState]);
     
     useEffect(() => {
         if (gameState === 'end' && !endOfRoundMessageSet.current) {
@@ -426,9 +396,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
             const revealedDealerHand = dealerHand.cards.map(c => ({...c, isHidden: false}));
             const dealerScoreInfo = calculateScore(revealedDealerHand);
             
-            const handsToEvaluate = playerHands;
-            
-            const playerHasBj = handsToEvaluate.length === 1 && handsToEvaluate[0]?.cards.length === 2 && handsToEvaluate[0]?.score === 21;
+            const playerHasBj = playerHands.length === 1 && playerHands[0]?.cards.length === 2 && playerHands[0]?.score === 21;
             const dealerHasBj = dealerScoreInfo.score === 21 && revealedDealerHand.length === 2;
 
             let resultMessage = '';
@@ -448,7 +416,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                 resultMessage = 'Push (Both have Blackjack).';
                 pushes++;
             } else {
-                handsToEvaluate.forEach((hand, index) => {
+                playerHands.forEach((hand, index) => {
                     if (!hand) return;
                     const outcomeValue = hand.isDoubled ? 2 : 1;
                     resultMessage += `Hand ${index + 1}: `;
@@ -491,7 +459,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
     useEffect(() => {
         const handleKeyDown = (event) => {
-            if (showCountPrompt) return;
+            if (isActionDisabled || showCountPrompt) return;
 
             if (gameState === 'player-turn') {
                 if (event.key.toLowerCase() === 'a') handlePlayerAction('H', 'Hit');
@@ -508,7 +476,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt]);
+    }, [gameState, canDouble, canSplit, dealNewGame, handlePlayerAction, showCountPrompt, isActionDisabled]);
 
     useEffect(() => {
         if (burstKey > 0) {
@@ -534,7 +502,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
 
     useEffect(() => {
         setTrainerMode('solo');
-        createShoe();
         setHistory([]);
         setCorrectCount(0);
         setIncorrectCount(0);
@@ -546,7 +513,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
         setStreakCount(0);
         setGameState('pre-deal');
         setMessage('Solo Mode: Press Deal to start.');
-    }, [createShoe]);
+    }, []);
 
 
     const activePlayerHand = useMemo(() => {
@@ -686,7 +653,7 @@ const BlackjackTrainer = ({ onGoBack }) => {
                         )}
                     </div>
                 </div>
-                {showCountPrompt && <CountPromptModal onConfirm={handleCountConfirm} />}
+                {showCountPrompt && <CountPromptModal onConfirm={() => {}} />}
                 {showChartModal && (
                     <BasicStrategyChartModal 
                         playerHand={activePlayerHand} 
@@ -747,136 +714,6 @@ const BlackjackTrainer = ({ onGoBack }) => {
                     animation: wash-away 1.5s ease-in forwards;
                 }
 
-                @keyframes subtle-glow {
-                    0%, 100% { text-shadow: 0 0 6px #ffffff55; }
-                    50% { text-shadow: 0 0 10px #ffffff88; }
-                }
-                .animate-subtle-glow {
-                    animation: subtle-glow 2.5s ease-in-out infinite;
-                }
-
-                @keyframes bright-glow {
-                    0%, 100% { text-shadow: 0 0 8px #ffffffaa, 0 0 12px #ffffff88; }
-                    50% { text-shadow: 0 0 16px #ffffff, 0 0 24px #ffffffaa; }
-                }
-                .animate-bright-glow {
-                    animation: bright-glow 2s ease-in-out infinite;
-                }
-
-                @keyframes blue-aura {
-                    0%, 100% { text-shadow: 0 0 10px #60a5fa, 0 0 20px #3b82f6; }
-                    50% { text-shadow: 0 0 15px #93c5fd, 0 0 30px #60a5fa; }
-                }
-                .animate-blue-aura {
-                    animation: blue-aura 2s ease-in-out infinite;
-                    color: #dbeafe;
-                }
-
-                @keyframes energy-flicker {
-                    0%   { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
-                    25%  { text-shadow: 0 0 12px #fde047, 0 0 25px #facc15; }
-                    50%  { text-shadow: 0 0 10px #fde047, 0 0 22px #facc15; }
-                    75%  { text-shadow: 0 0 14px #fde047, 0 0 28px #facc15; }
-                    100% { text-shadow: 0 0 10px #fde047, 0 0 20px #facc15; }
-                }
-                .animate-energy-flicker {
-                    animation: energy-flicker 1.5s linear infinite;
-                    color: #fef9c3;
-                }
-
-                @keyframes slow-pulse {
-                    0%, 100% { transform: scale(1); }
-                    50% { transform: scale(1.05); }
-                }
-                .animate-slow-pulse {
-                    animation: slow-pulse 2.5s ease-in-out infinite;
-                    color: #ede9fe;
-                }
-
-                .animate-pulse-flicker {
-                    animation: slow-pulse 2.5s ease-in-out infinite, energy-flicker 1.5s linear infinite;
-                    color: #fef9c3;
-                }
-
-                @keyframes ring-glow-rose {
-                    from { box-shadow: 0 0 10px 0px #fecdd3, inset 0 0 10px 0px #fecdd3; }
-                    to { box-shadow: 0 0 20px 5px #fecdd3, inset 0 0 20px 2px #fecdd3; }
-                }
-                .animate-slow-pulse-ring {
-                    animation: slow-pulse 2.5s ease-in-out infinite;
-                    color: #fecdd3;
-                    text-shadow: 0 0 12px #fecdd3;
-                }
-                .animate-slow-pulse-ring::before {
-                    content: '';
-                    position: absolute;
-                    inset: -8px;
-                    border-radius: 1rem;
-                    z-index: -1;
-                    animation: ring-glow-rose 2.5s ease-in-out infinite alternate;
-                }
-
-                @keyframes fast-pulse {
-                    0%, 100% { transform: scale(1); }
-                    50% { transform: scale(1.08); }
-                }
-                @keyframes text-glow-red {
-                    from { text-shadow: 0 0 10px #fca5a5, 0 0 20px #ef4444; }
-                    to { text-shadow: 0 0 20px #fca5a5, 0 0 30px #ef4444, 0 0 40px #ef4444; }
-                }
-                .animate-fast-pulse-ring {
-                    animation: fast-pulse 1s ease-in-out infinite, text-glow-red 1.5s ease-in-out infinite alternate;
-                    color: #fca5a5;
-                }
-                .animate-fast-pulse-ring::before {
-                    content: '';
-                    position: absolute;
-                    inset: -8px;
-                    border-radius: 1rem;
-                    z-index: -1;
-                    animation: ring-glow-rose 1s ease-in-out infinite alternate;
-                }
-
-                @keyframes cosmic-border-shift {
-                    to { background-position: 200% center; }
-                }
-                @keyframes cosmic-text-glow {
-                    from { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff; }
-                    to { text-shadow: 0 0 20px #fff, 0 0 30px #60a5fa, 0 0 40px #60a5fa; }
-                }
-                @keyframes aura-ring-pulse {
-                    from { box-shadow: 0 0 20px 5px #ffffff88; opacity: 0.7; }
-                    to { box-shadow: 0 0 35px 15px #ffffff00; opacity: 1; }
-                }
-                .tier-8-box {
-                    background-color: #1e1b4b;
-                    border: 4px solid transparent;
-                    background-clip: padding-box;
-                    position: relative;
-                }
-                .tier-8-box::before {
-                    content: '';
-                    position: absolute;
-                    top: -4px; bottom: -4px; left: -4px; right: -4px;
-                    background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #84cc16, #22c55e, #14b8a6, #06b6d4, #3b82f6, #8b5cf6, #d946ef, #ef4444);
-                    background-size: 200% 100%;
-                    border-radius: 1rem;
-                    animation: cosmic-border-shift 4s linear infinite;
-                    z-index: -1;
-                }
-                .tier-8-box::after {
-                    content: '';
-                    position: absolute;
-                    inset: -10px;
-                    border-radius: 1.25rem;
-                    z-index: -2;
-                    animation: aura-ring-pulse 2s ease-in-out infinite alternate;
-                }
-                .tier-8-box .cosmic-text {
-                    color: #fff;
-                    animation: cosmic-text-glow 2s ease-in-out infinite alternate;
-                }
-                
                 #fullscreen-announcement {
                     display: none;
                     position: fixed;
@@ -947,4 +784,3 @@ const BlackjackTrainer = ({ onGoBack }) => {
 }
 
 export default BlackjackTrainer;
-
