@@ -6,7 +6,7 @@ import React, { useCallback } from 'react';
 const BasicStrategyModal = ({ playerHand, dealerUpCard, onClose, calculateScore }) => {
     const dealerRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
     const hardTotals = ['7-', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17+'];
-    const softTotals = ['A,2', 'A,3', 'A,4', 'A,5', 'A,6', 'A,7', 'A,8', 'A,9'];
+    const softTotals = ['13', '14', '15', '16', '17', '18', '19', '20'];
     const pairs = ['2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '10s', 'As'];
 
     const strategyData = {
@@ -57,14 +57,14 @@ const BasicStrategyModal = ({ playerHand, dealerUpCard, onClose, calculateScore 
             return `${normalizedRank}s`;
         }
         if (isSoft) {
-            if (score >= 20) return 'A,9';
-            if (score === 19) return 'A,8';
-            if (score === 18) return 'A,7';
-            if (score === 17) return 'A,6';
-            if (score === 16) return 'A,5';
-            if (score === 15) return 'A,4';
-            if (score === 14) return 'A,3';
-            if (score === 13) return 'A,2';
+            if (score >= 20) return '20';
+            if (score === 19) return '19';
+            if (score === 18) return '18';
+            if (score === 17) return '17';
+            if (score === 16) return '16';
+            if (score === 15) return '15';
+            if (score === 14) return '14';
+            if (score === 13) return '13';
         }
         if (score >= 17) return '17+';
         if (score >= 5 && score <= 7) return '7-';
@@ -211,4 +211,5 @@ const BasicStrategyModal = ({ playerHand, dealerUpCard, onClose, calculateScore 
 
 
 export default BasicStrategyModal;
+
 
