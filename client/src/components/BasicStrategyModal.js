@@ -24,14 +24,14 @@ const BasicStrategyModal = ({ playerHand, dealerUpCard, onClose, calculateScore 
             '7-': ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
         },
         soft: {
-            'A,9': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-            'A,8': ['S', 'S', 'S', 'S', 'D', 'S', 'S', 'S', 'S', 'S'],
-            'A,7': ['D', 'D', 'D', 'D', 'D', 'S', 'S', 'H', 'H', 'H'],
-            'A,6': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,5': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,4': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,3': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
-            'A,2': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '20': ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+            '19': ['S', 'S', 'S', 'S', 'D', 'S', 'S', 'S', 'S', 'S'],
+            '18': ['D', 'D', 'D', 'D', 'D', 'S', 'S', 'H', 'H', 'H'],
+            '17': ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '16': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '15': ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '14': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+            '13': ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
         },
         pairs: {
             'As': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
@@ -211,3 +211,4 @@ const BasicStrategyModal = ({ playerHand, dealerUpCard, onClose, calculateScore 
 
 
 export default BasicStrategyModal;
+
